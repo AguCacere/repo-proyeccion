@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proyección Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Bibliotecas para PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="logo">
+            <svg width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="20" cy="20" r="20" fill="#1d1d1f" />
+                <path d="M10 20L18 28L30 14" stroke="white" stroke-width="3" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </svg>
+            <span>Proyección v1</span>
+        </div>
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item active" onclick="location.href='index.html'">
+                    <span>📊 Dashboard</span>
+                </li>
+                <li class="nav-item" onclick="alert('Histórico en desarrollo')">
+                    <span>📅 Histórico</span>
+                </li>
+                <li class="nav-item" onclick="location.href='monitoreo.html'">
+                    <span>🕵️ Monitoreo</span>
+                </li>
+                <li class="nav-item" onclick="alert('Configuración en desarrollo')">
+                    <span>⚙️ Configuración</span>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <!-- Dashboard Header (2 capas) -->
+        <div class="dashboard-topbar">
+    <div class="title-section">
+        <h1>Proyeccion Mensual</h1>
+        <div class="topbar-filters">
+            <select id="filterType" class="filter-select">
+                <option value="all">Todos los Tipos</option>
+                <option value="Normal">Normal</option>
+                <option value="Hábil">Hábiles</option>
+                <option value="Feriado">Feriados</option>
+            </select>
+            <div class="toolbar-separator"></div>
+            <div class="date-input-wrapper custom-month-wrapper">
+                <div class="custom-month-trigger" id="customMonthTrigger">
+                    <span id="customMonthDisplay">Seleccionar mes</span>
+                    <i class="calendar-icon">📅</i>
+                </div>
+                <input type="hidden" id="filterMonth" class="filter-select" value="">
+                <div class="custom-month-dropdown" id="customMonthDropdown">
+                    <div class="cmd-header">
+                        <button class="cmd-btn-nav" id="cmdPrevYear">◀</button>
+                        <span class="cmd-year" id="cmdCurrentYear">2026</span>
+                        <button class="cmd-btn-nav" id="cmdNextYear">▶</button>
+                    </div>
+                    <div class="cmd-grid" id="cmdMonthGrid"></div>
+                    <div class="cmd-footer">
+                        <button class="cmd-btn-clear" id="cmdClearBtn">Borrar</button>
+                        <button class="cmd-btn-today" id="cmdTodayBtn">Este mes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="header-btns">
+        <button class="btn btn-pdf" onclick="generatePDFReport()">📄 Generar PDF</button>
+        <button class="btn btn-export" onclick="exportData()">📗 Exportar XLSX</button>
+        <button class="btn btn-import" onclick="document.getElementById('importFile').click()">📗 Importar XLSX</button>
+        <button class="btn btn-add" onclick="openAddModal()">➕ Registro</button>
+        <input type="file" id="importFile" style="display: none;" accept=".xlsx, .xls" onchange="importData(event)">
+    </div>
+</div>
+
+        <!-- La barra de filtros vieja se elimina ya que ahora está embebida en la cabecera -->
+
+        <div class="dashboard-grid">
+            <div class="stat-card card-success">
+                <h3>Efectividad Promedio</h3>
+                <div class="value" id="avgEffectiveness">0%</div>
+                <div class="trend up" id="trendEffectiveness">↑ 2.4% vs mes anterior</div>
+            </div>
+            <div class="stat-card">
+                <h3>Días dentro de Proyección</h3>
+                <div class="value" id="daysOk">0</div>
+                <div class="trend" id="trendOk">Días totales analizados</div>
+            </div>
+            <div class="stat-card card-fail">
+                <h3>Días fuera de Proyección</h3>
+                <div class="value" id="daysFail">0</div>
+                <div class="trend down" id="trendFail">Requieren atención</div>
+            </div>
+            <div class="stat-card">
+                <h3>Demora Promedio</h3>
+                <div class="value" id="avgDelay">0 min</div>
+                <div class="trend" id="trendDelay">Por cada incidente</div>
+            </div>
+        </div>
+
+        <!-- Alerta de Riesgo entre KPIs y Gráfico -->
+        <div id="riskBanner" class="risk-banner" style="display: none;"></div>
+
+
+
+        <div class="chart-container">
+            <div class="chart-header">
+                <h2>Gráfico Efectividad</h2>
+                <div class="chart-legend-container" id="customLegend">
+                    <div class="legend-item">
+                        <span class="legend-dot" style="background-color: #0055ff;"></span>
+                        <span class="legend-label">Ejecución Real</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot" style="background-color: #c1c1c6; border: 1px dashed #777;"></span>
+                        <span class="legend-label">Proyección (Base)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-summary-row">
+                <div class="chart-summary-item mini-card">
+                    <span class="label">Promedio</span>
+                    <span class="value" id="chartAvgDev">0%</span>
+                </div>
+                <div class="chart-summary-item mini-card">
+                    <span class="label">Desvíos</span>
+                    <span class="value anomaly-value" id="chartAnomalies">0</span>
+                </div>
+                <div class="chart-summary-item mini-card">
+                    <span class="label">Mayor Desviación</span>
+                    <span class="value" id="chartMaxDev">0%</span>
+                </div>
+            </div>
+
+            <div class="chart-divider"></div>
+
+            <div style="height: 320px; position: relative; margin-top: 10px;">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th data-sort="fecha" onclick="handleSort('fecha')">Fecha</th>
+                        <th data-sort="tipo" onclick="handleSort('tipo')">Tipo</th>
+                        <th data-sort="proyectado" onclick="handleSort('proyectado')">Proyectado</th>
+                        <th data-sort="real" onclick="handleSort('real')">Real</th>
+                        <th data-sort="demora" onclick="handleSort('demora')">Demora</th>
+                        <th data-sort="estado" onclick="handleSort('estado')">Estado</th>
+                        <th data-sort="motivo" onclick="handleSort('motivo')">Motivo de Demora</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody">
+                    <!-- Data will be injected here -->
+                </tbody>
+            </table>
+        </div>
+
+
+    </main>
+
+    <!-- Custom Modal for Remoras -->
+    <div id="motivoModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Editar Motivo de Demora</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Especificar motivo:</label>
+                    <textarea id="motivoInput" class="form-control" rows="4"
+                        placeholder="Escribe aquí el motivo..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('motivoModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveMotivo()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal for adding records -->
+    <div id="addRecordModal" class="modal-overlay">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 id="modalTitle">Añadir Nuevo Registro</h2>
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="addFecha" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="addTipo" class="form-control">
+                            <option value="Normal">Normal</option>
+                            <option value="Día 10">Día 10 (Crítico)</option>
+                            <option value="1er Hábil">1er Hábil</option>
+                            <option value="2do Hábil">2do Hábil</option>
+                            <option value="5to Hábil">5to Hábil</option>
+                            <option value="Ante Último Hábil">Ante Último Hábil</option>
+                            <option value="Último Hábil">Último Hábil</option>
+                            <option value="Feriado">Feriado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Hora Mín (HH:MM)</label>
+                        <input type="time" id="addHoraMin" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Hora Máx (HH:MM)</label>
+                        <input type="time" id="addHoraMax" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Horario Real (HH:MM)</label>
+                        <input type="time" id="addHorarioReal" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Demoras (HH:MM:SS)</label>
+                        <input type="time" id="addDemoras" class="form-control" step="1"
+                            title="Introduce el tiempo de demora (ej: 00:15:30)">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('addRecordModal')">Cancelar</button>
+                <button class="btn btn-primary" id="btnSaveRecord" onclick="saveRecordAction()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación de Eliminación -->
+    <div id="deleteConfirmModal" class="modal-overlay">
+        <div class="modal delete-modal">
+            <div class="modal-body">
+                <div class="delete-icon">⚠️</div>
+                <h2>¿Eliminar registro?</h2>
+                <p>Estás a punto de eliminar permanentemente el registro del <strong id="deleteRecordDate">---</strong>.
+                </p>
+                <p class="delete-warning">Esta acción no se puede deshacer.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('deleteConfirmModal')">Cancelar</button>
+                <button class="btn btn-primary btn-danger" id="btnConfirmDelete">Eliminar</button>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Supabase SDK & Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
