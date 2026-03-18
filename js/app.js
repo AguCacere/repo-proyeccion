@@ -208,6 +208,11 @@ function updateDashboard() {
         updateMonitoringAlerts(filteredData);
     }
 
+    if (document.getElementById('monitoringGroups')) {
+        const prevMonth = getPreviousMonth(filterMonth);
+        renderMonitoringPage(filterMonth, prevMonth);
+    }
+
     // Actualizar Alerta Dinámica en el Header (Toolbar)
     const statusAlert = document.getElementById('dynamicStatusAlert');
     if (statusAlert) {
@@ -1708,4 +1713,192 @@ function hideCustomTooltip(event) {
         event.target.removeEventListener('mousemove', event.target._tooltipUpdatePos);
         delete event.target._tooltipUpdatePos;
     }
+}
+// --- Monitoreo de Horarios (Rework Page) ---
+function getPreviousMonth(monthStr) {
+    if (!monthStr || !monthStr.includes('-')) return '';
+    const [year, month] = monthStr.split('-').map(Number);
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth === 0) {
+        prevMonth = 12;
+        prevYear -= 1;
+    }
+    return `${prevYear}-${prevMonth.toString().padStart(2, '0')}`;
+}
+
+async function renderMonitoringPage(currentMonth, previousMonth) {
+    const container = document.getElementById('monitoringGroups');
+    const kpiContainer = document.getElementById('globalMonitoringKPIs');
+    if (!container || !kpiContainer) return;
+
+    const groupDefinitions = [
+        { 
+            id: 'lunes-normal', 
+            title: 'Lunes Normal', 
+            filter: (item) => item.diaSemana === 'Lunes' && item.tipo === 'Normal' 
+        },
+        { 
+            id: 'martes-jueves-normal', 
+            title: 'Martes a Jueves Normal', 
+            filter: (item) => ['Martes', 'Miércoles', 'Jueves'].includes(item.diaSemana) && item.tipo === 'Normal' 
+        },
+        { 
+            id: 'viernes-todos', 
+            title: 'Viernes (Todos)', 
+            filter: (item) => item.diaSemana === 'Viernes' 
+        },
+        { 
+            id: 'dias-especiales', 
+            title: 'Días Especiales', 
+            filter: (item) => item.tipo !== 'Normal' 
+        }
+    ];
+
+    let groupResults = [];
+    let totalRecords = 0;
+
+    // Primer pase: Calcular promedios y recolectar resultados para KPIs globales
+    groupDefinitions.forEach(group => {
+        const currentData = window.projectionData.filter(item => 
+            item.fecha.startsWith(currentMonth) && group.filter(item)
+        ).sort((a,b) => a.fecha.localeCompare(b.fecha));
+
+        const previousData = window.projectionData.filter(item => 
+            item.fecha.startsWith(previousMonth) && group.filter(item)
+        );
+
+        const currentAvg = calculateAverage(currentData);
+        const previousAvg = calculateAverage(previousData);
+        
+        groupResults.push({
+            ...group,
+            currentData,
+            previousData,
+            currentAvg,
+            previousAvg
+        });
+
+        totalRecords += currentData.length;
+    });
+
+    // Renderizar KPIs Globales
+    if (groupResults.length > 0) {
+        const activeGroups = groupResults.filter(g => g.currentAvg > 0);
+        const bestGroup = activeGroups.length > 0 ? activeGroups.reduce((prev, curr) => prev.currentAvg < curr.currentAvg ? prev : curr) : { title: 'N/A', currentAvg: 0 };
+        const worstGroup = activeGroups.length > 0 ? activeGroups.reduce((prev, curr) => prev.currentAvg > curr.currentAvg ? prev : curr) : { title: 'N/A', currentAvg: 0 };
+        const globalAvg = activeGroups.length > 0 ? Math.round(activeGroups.reduce((acc, g) => acc + g.currentAvg, 0) / activeGroups.length) : 0;
+
+        kpiContainer.innerHTML = `
+            <div class="global-kpi-container">
+                <div class="monitoring-kpi-card best">
+                    <span class="label">Mejor Grupo (Más Temprano)</span>
+                    <span class="value best">${bestGroup.title} <small style="font-size: 0.7rem; font-weight: 400;">(${minutesToHHMM(bestGroup.currentAvg)})</small></span>
+                </div>
+                <div class="monitoring-kpi-card worst">
+                    <span class="label">Peor Grupo (Más Tardío)</span>
+                    <span class="value worst">${worstGroup.title} <small style="font-size: 0.7rem; font-weight: 400;">(${minutesToHHMM(worstGroup.currentAvg)})</small></span>
+                </div>
+                <div class="monitoring-kpi-card standard">
+                    <span class="label">Promedio Global</span>
+                    <span class="value standard">${minutesToHHMM(globalAvg)}</span>
+                </div>
+                <div class="monitoring-kpi-card standard">
+                    <span class="label">Total Registros</span>
+                    <span class="value standard">${totalRecords}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Segundo pase: Renderizar tarjetas de grupo
+    let html = '';
+    groupResults.forEach(res => {
+        const diff = res.currentAvg - res.previousAvg;
+        const diffPercent = res.previousAvg > 0 ? ((diff / res.previousAvg) * 100).toFixed(1) : 0;
+        
+        let semClass = 'neutral';
+        let trendClass = 'neutral';
+        if (res.previousAvg > 0) {
+            semClass = diff > 0 ? 'bad' : 'good';
+            trendClass = diff > 0 ? 'bad' : 'good';
+        }
+        
+        const diffIcon = diff > 0 ? '↑' : '↓';
+
+        // Determinar si ocultar columna Tipo
+        const allSameType = res.currentData.every(item => item.tipo === res.currentData[0].tipo);
+        const hideType = allSameType && res.id !== 'dias-especiales';
+
+        // Identificar mejor/peor valor de la tabla para resaltado semántico
+        let minTime = null;
+        let maxTime = null;
+        if (res.currentData.length > 1) {
+            const times = res.currentData.map(d => timeToMinutes(d.horarioSindemora)).filter(t => t > 0);
+            if (times.length > 0) {
+                minTime = Math.min(...times);
+                maxTime = Math.max(...times);
+            }
+        }
+
+        html += `
+            <div class="monitoring-group-card">
+                <div class="group-header">
+                    ${res.title}
+                    ${res.previousAvg > 0 ? `<span class="group-trend-badge ${trendClass}">${diffIcon} ${Math.abs(diffPercent)}%</span>` : ''}
+                </div>
+                <table class="group-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            ${!hideType ? '<th>Tipo</th>' : ''}
+                            <th>Día</th>
+                            <th>Sin Demora</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${res.currentData.map(item => {
+                            const itemMinutes = timeToMinutes(item.horarioSindemora);
+                            let rowClass = '';
+                            if (minTime !== null && maxTime !== null && minTime !== maxTime) {
+                                if (itemMinutes === minTime) rowClass = 'row-val-best';
+                                else if (itemMinutes === maxTime) rowClass = 'row-val-worst';
+                            }
+                            return `
+                                <tr>
+                                    <td>${item.fecha.split('-').slice(1).reverse().join('/')}</td>
+                                    ${!hideType ? `<td>${item.tipo}</td>` : ''}
+                                    <td>${item.diaSemana.substring(0, 3)}</td>
+                                    <td class="${rowClass}">${item.horarioSindemora}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                        ${res.currentData.length === 0 ? `<tr><td colspan="${hideType ? 3 : 4}" style="color:#9CA3AF; padding: 20px; text-align: center;">Sin registros para el mes actual</td></tr>` : ''}
+                    </tbody>
+                </table>
+                <div class="group-summary-footer">
+                    <div class="avg-box">
+                        <div class="avg-label">Hora Promedio</div>
+                        <div class="avg-value ${semClass}">${minutesToHHMM(res.currentAvg)}</div>
+                    </div>
+                </div>
+                <div class="comparison-box">
+                    <div class="comp-pill-mini ant" title="Promedio mes anterior">
+                        Ant ${minutesToHHMM(res.previousAvg)}
+                    </div>
+                    <div class="comp-pill-mini act ${semClass}" title="Promedio mes actual">
+                        Act ${minutesToHHMM(res.currentAvg)}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function calculateAverage(data) {
+    if (!data || data.length === 0) return 0;
+    const totalMinutes = data.reduce((acc, item) => acc + timeToMinutes(item.horarioSindemora), 0);
+    return Math.round(totalMinutes / data.length);
 }
