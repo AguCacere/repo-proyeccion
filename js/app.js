@@ -431,99 +431,133 @@ function extractProcessesFromMotivo(motivo, fecha) {
     return results;
 }
 
+// Genera un SVG del gráfico de forma stateless (sin dependencias de charting).
+// Equivalente directo a build_chart_svg() de la especificación Python/ReportLab.
+function buildChartSVG(data, width = 520, height = 220) {
+    const ML = 45, MT = 15, MR = 20, MB = 35;
+    const x0 = ML, y0 = MT, x1 = width - MR, y1 = height - MB;
+    const n = data.length;
+
+    if (n === 0) {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"></svg>`;
+    }
+
+    const classified = data.map(d => ({ ...d, _status: classifyStatusPDF(d) }));
+    const realVals    = data.map(d => timeToMinutes(d.horarioReal));
+    const projMinVals = data.map(d => timeToMinutes(d.horaMin));
+    const projMaxVals = data.map(d => timeToMinutes(d.horaMax));
+
+    // Y range — rounded to multiples of 30
+    const allVals = [...realVals, ...projMinVals, ...projMaxVals].filter(v => v > 0);
+    let yMin = Math.floor((Math.min(...allVals) - 20) / 30) * 30;
+    let yMax = Math.ceil((Math.max(...allVals) + 20) / 30) * 30;
+    if (yMin === yMax) { yMin -= 30; yMax += 30; }
+
+    const mapX = i  => x0 + (n === 1 ? (x1 - x0) / 2 : i * (x1 - x0) / (n - 1));
+    const mapY = v  => y1 - (v - yMin) / (yMax - yMin) * (y1 - y0);
+    const fmt  = v  => { const h = Math.floor(v / 60); const m = v % 60; return `${h}:${m.toString().padStart(2, '0')}`; };
+    const f1   = v  => v.toFixed(1);
+
+    const parts = [];
+    parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`);
+
+    // 1. Horizontal grid lines
+    for (let t = 0; t <= 4; t++) {
+        const gy = f1(mapY(yMin + t * (yMax - yMin) / 4));
+        parts.push(`<line x1="${x0}" y1="${gy}" x2="${x1}" y2="${gy}" stroke="#F0F0F0" stroke-width="1"/>`);
+    }
+
+    // 2. Band fill (proj range polygon)
+    const bandPts = [
+        ...projMinVals.map((v, i) => `${f1(mapX(i))},${f1(mapY(v))}`),
+        ...[...projMaxVals].reverse().map((v, i) => `${f1(mapX(n - 1 - i))},${f1(mapY(v))}`),
+    ].join(' ');
+    parts.push(`<polygon points="${bandPts}" fill="#378ADD" fill-opacity="0.08" stroke="none"/>`);
+
+    // 3. Band borders (dashed)
+    const minPts = projMinVals.map((v, i) => `${f1(mapX(i))},${f1(mapY(v))}`).join(' ');
+    const maxPts = projMaxVals.map((v, i) => `${f1(mapX(i))},${f1(mapY(v))}`).join(' ');
+    parts.push(`<polyline points="${minPts}" fill="none" stroke="#85B7EB" stroke-width="1" stroke-dasharray="4 3" stroke-opacity="0.6"/>`);
+    parts.push(`<polyline points="${maxPts}" fill="none" stroke="#85B7EB" stroke-width="1" stroke-dasharray="4 3" stroke-opacity="0.6"/>`);
+
+    // 4. Real line — smooth cubic bezier
+    const pts = realVals.map((v, i) => ({ x: mapX(i), y: mapY(v) }));
+    let pathD = `M ${f1(pts[0].x)},${f1(pts[0].y)}`;
+    for (let i = 1; i < pts.length; i++) {
+        const pp = pts[Math.max(0, i - 2)];
+        const p0 = pts[i - 1];
+        const p1 = pts[i];
+        const p2 = pts[Math.min(pts.length - 1, i + 1)];
+        const cp1x = p0.x + (p1.x - pp.x) * 0.2;
+        const cp1y = p0.y + (p1.y - pp.y) * 0.2;
+        const cp2x = p1.x - (p2.x - p0.x) * 0.2;
+        const cp2y = p1.y - (p2.y - p0.y) * 0.2;
+        pathD += ` C ${f1(cp1x)},${f1(cp1y)} ${f1(cp2x)},${f1(cp2y)} ${f1(p1.x)},${f1(p1.y)}`;
+    }
+    parts.push(`<path d="${pathD}" stroke="#378ADD" stroke-width="2" fill="none" stroke-linejoin="round"/>`);
+
+    // 5. Points colored by status
+    const PT_COLORS = { OK: '#22c55e', FUERA_DEMORA: '#E24B4A', FUERA_ADELANTO: '#EF9F27' };
+    classified.forEach((item, i) => {
+        const color = PT_COLORS[item._status] || '#22c55e';
+        parts.push(`<circle cx="${f1(mapX(i))}" cy="${f1(mapY(realVals[i]))}" r="5.5" fill="${color}" stroke="#FFFFFF" stroke-width="2"/>`);
+    });
+
+    // 6. X axis labels (day number)
+    data.forEach((item, i) => {
+        parts.push(`<text x="${f1(mapX(i))}" y="${f1(y1 + 18)}" font-size="10" fill="#999999" text-anchor="middle" font-family="Helvetica">${item.fecha.split('-')[2]}</text>`);
+    });
+
+    // 7. Y axis ticks
+    for (let t = 0; t <= 4; t++) {
+        const v  = yMin + t * (yMax - yMin) / 4;
+        const ty = f1(mapY(v));
+        parts.push(`<text x="${f1(x0 - 8)}" y="${ty}" font-size="10" fill="#999999" text-anchor="end" font-family="Helvetica" dominant-baseline="middle">${fmt(v)}</text>`);
+    }
+
+    // 8. Legend — centered at bottom
+    const legendDefs = [
+        { color: '#22c55e', label: 'Ejecuci\u00f3n real',  w: 94 },
+        { color: '#E24B4A', label: 'FUERA (demora)',        w: 88 },
+        { color: '#EF9F27', label: 'FUERA (adelanto)',      w: 96 },
+    ];
+    const legendGap   = 20;
+    const legendTotalW = legendDefs.reduce((s, d) => s + d.w, 0) + legendGap * (legendDefs.length - 1);
+    let lx = (width - legendTotalW) / 2;
+    const ly = height - 6;
+    legendDefs.forEach(item => {
+        parts.push(`<circle cx="${f1(lx + 4)}" cy="${f1(ly - 3)}" r="4" fill="${item.color}"/>`);
+        parts.push(`<text x="${f1(lx + 12)}" y="${ly}" font-size="10" fill="#666666" font-family="Helvetica">${item.label}</text>`);
+        lx += item.w + legendGap;
+    });
+
+    parts.push('</svg>');
+    return parts.join('\n');
+}
+
+// Convierte el SVG generado en una imagen PNG lista para jsPDF.
+// Usa el renderer SVG nativo del browser vía un elemento Image.
 function generatePDFChartImage(data, classified) {
-    return new Promise((resolve) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 900;
-        canvas.height = 300;
-        canvas.style.cssText = 'position:absolute;left:-9999px;top:-9999px';
-        document.body.appendChild(canvas);
-
-        const labels   = data.map(d => d.fecha.split('-')[2]);
-        const minData  = data.map(d => timeToMinutes(d.horaMin));
-        const maxData  = data.map(d => timeToMinutes(d.horaMax));
-        const realData = data.map(d => timeToMinutes(d.horarioReal));
-        const ptColors = classified.map(d => {
-            if (d._status === 'FUERA_DEMORA')   return '#ef4444';
-            if (d._status === 'FUERA_ADELANTO') return '#f59e0b';
-            return '#22c55e';
-        });
-
-        const ch = new Chart(canvas, {
-            type: 'line',
-            data: {
-                labels,
-                datasets: [
-                    {
-                        data: minData,
-                        borderColor: 'transparent',
-                        pointRadius: 0,
-                        fill: false,
-                        order: 3,
-                    },
-                    {
-                        label: 'Rango proyectado',
-                        data: maxData,
-                        borderColor: 'rgba(0,85,255,0.3)',
-                        borderWidth: 1.5,
-                        borderDash: [5, 4],
-                        pointRadius: 0,
-                        fill: '-1',
-                        backgroundColor: 'rgba(0,85,255,0.08)',
-                        order: 2,
-                    },
-                    {
-                        label: 'Ejecucion real',
-                        data: realData,
-                        borderColor: '#0055ff',
-                        borderWidth: 2,
-                        pointBackgroundColor: ptColors,
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 1,
-                        pointRadius: 5,
-                        fill: false,
-                        order: 1,
-                    },
-                ],
-            },
-            options: {
-                animation: false,
-                responsive: false,
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'bottom',
-                        labels: {
-                            filter: item => item.datasetIndex !== 0,
-                            usePointStyle: true,
-                            boxWidth: 8,
-                            font: { size: 11 },
-                        },
-                    },
-                    tooltip: { enabled: false },
-                },
-                scales: {
-                    x: {
-                        grid: { color: '#f0f0f0' },
-                        ticks: { font: { size: 10 } },
-                    },
-                    y: {
-                        grid: { color: '#f0f0f0' },
-                        ticks: {
-                            font: { size: 10 },
-                            callback: v => pdfMinsToHHMM(v),
-                        },
-                    },
-                },
-            },
-        });
-
-        setTimeout(() => {
-            const img = canvas.toDataURL('image/png');
-            ch.destroy();
-            document.body.removeChild(canvas);
-            resolve(img);
-        }, 150);
+    const svgString = buildChartSVG(data);
+    return new Promise((resolve, reject) => {
+        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url  = URL.createObjectURL(blob);
+        const img  = new Image();
+        img.onload = () => {
+            const scale  = 2; // 2× para calidad retina
+            const canvas = document.createElement('canvas');
+            canvas.width  = 520 * scale;
+            canvas.height = 220 * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(scale, scale);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, 520, 220);
+            ctx.drawImage(img, 0, 0, 520, 220);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = e => { URL.revokeObjectURL(url); reject(e); };
+        img.src = url;
     });
 }
 
