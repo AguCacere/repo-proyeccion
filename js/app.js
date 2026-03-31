@@ -1365,9 +1365,8 @@ function renderChart(data) {
                 {
                     label: 'Proyección (Base)',
                     data: baselineData,
-                    borderColor: '#f59e0b',
-                    borderDash: [6, 3],
-                    borderWidth: 2,
+                    borderColor: 'rgba(99, 102, 241, 0.7)',
+                    borderWidth: 1.5,
                     pointRadius: 0,
                     fill: false,
                     tension: 0.4
@@ -1376,10 +1375,9 @@ function renderChart(data) {
                     label: 'Ejecución Real',
                     data: realData,
                     borderColor: '#0055ff',
-                    backgroundColor: realGradient,
                     borderWidth: 3,
-                    tension: 0.4, // Suavizado premium
-                    fill: true,   // Área sombreada suave
+                    tension: 0.4,
+                    fill: false,
                     pointRadius: pointRadii,
                     pointBackgroundColor: pointColors,
                     pointBorderColor: '#fff',
