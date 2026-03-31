@@ -1333,7 +1333,7 @@ function renderChart(data) {
 
     // Gradientes para áreas y líneas
     const realGradient = ctx.createLinearGradient(0, 0, 0, 400);
-    realGradient.addColorStop(0, 'rgba(0, 85, 255, 0.2)');
+    realGradient.addColorStop(0, 'rgba(0, 85, 255, 0.06)');
     realGradient.addColorStop(1, 'rgba(0, 85, 255, 0)');
 
     // Guardar datos actuales para el tooltip externo
@@ -1365,9 +1365,9 @@ function renderChart(data) {
                 {
                     label: 'Proyección (Base)',
                     data: baselineData,
-                    borderColor: '#c1c1c6',
-                    borderDash: [5, 5],
-                    borderWidth: 1.5,
+                    borderColor: '#f59e0b',
+                    borderDash: [6, 3],
+                    borderWidth: 2,
                     pointRadius: 0,
                     fill: false,
                     tension: 0.4
