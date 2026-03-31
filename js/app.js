@@ -375,44 +375,131 @@ function updateRiskPrediction() {
 async function generatePDFReport() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
-    const dashboard = document.querySelector('.main-content');
 
-    // Mostrar feedback visual
     const btn = document.querySelector('.btn-pdf');
     const originalText = btn.innerHTML;
     btn.innerHTML = '⏳ Generando...';
     btn.disabled = true;
 
     try {
-        // Capturar el grid de stacks y el gráfico (excluyendo tabla para el reporte ejecutivo)
-        const canvas = await html2canvas(dashboard, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            ignoreElements: (el) => el.tagName === 'TABLE' || el.classList.contains('actions-header') || el.classList.contains('sidebar') || el.classList.contains('filters-bar')
-        });
-
-        const imgData = canvas.toDataURL('image/png');
-        const imgProps = doc.getImageProperties(imgData);
+        const data = window.currentChartData || [];
         const pdfWidth = doc.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        const margin = 16;
 
-        // Título del Reporte
-        doc.setFontSize(22);
+        // --- Título ---
+        doc.setFontSize(26);
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(29, 29, 31);
-        doc.text('Reporte Ejecutivo de Proyección', 20, 25);
+        doc.text('Proyección Mensual', margin, 22);
 
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Fecha de generación: ${new Date().toLocaleString()}`, 20, 32);
+        // --- Línea separadora bajo el título ---
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.4);
+        doc.line(margin, 26, pdfWidth - margin, 26);
 
-        doc.addImage(imgData, 'PNG', 10, 45, pdfWidth - 20, pdfHeight);
+        // --- Texto de eficacia ---
+        let yPos = 36;
+        const monthsNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                             'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const filterMonthVal = document.getElementById('filterMonth').value; // YYYY-MM
+        let mesNombre = '';
+        if (filterMonthVal) {
+            const monthIndex = parseInt(filterMonthVal.split('-')[1], 10) - 1;
+            mesNombre = monthsNames[monthIndex] || filterMonthVal;
+        } else if (data.length > 0) {
+            const monthIndex = parseInt(data[0].fecha.split('-')[1], 10) - 1;
+            mesNombre = monthsNames[monthIndex] || '';
+        }
 
-        // Footer
-        doc.setFontSize(9);
-        doc.text('Generado automáticamente por SQR Tracker - Operaciones Bancarias', 105, 285, { align: 'center' });
+        const total = data.length;
+        let eficaciaText = '';
+        if (total > 0) {
+            const okDays = data.filter(item => calculateStatus(item) === 'OK').length;
+            const effectiveness = ((okDays / total) * 100).toFixed(1);
+            eficaciaText = `La proyección tuvo una eficacia de ${effectiveness}% el mes de ${mesNombre}.`;
+        } else {
+            eficaciaText = `Proyección del mes de ${mesNombre}.`;
+        }
 
-        doc.save(`Reporte_SQR_${new Date().toISOString().split('T')[0]}.pdf`);
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(80, 80, 80);
+        doc.text(eficaciaText, margin, yPos);
+        yPos += 12;
+
+        // --- Gráfico ---
+        const chartCanvas = document.getElementById('trendChart');
+        if (chartCanvas) {
+            const chartImgData = chartCanvas.toDataURL('image/png');
+            const chartW = pdfWidth - margin * 2;
+            const chartH = chartW * (chartCanvas.height / chartCanvas.width);
+            doc.addImage(chartImgData, 'PNG', margin, yPos, chartW, Math.min(chartH, 80));
+            yPos += Math.min(chartH, 80) + 8;
+        }
+
+        // --- Tabla ---
+        if (data.length > 0) {
+            const tableHead = [['Fecha', 'Tipo', 'Proyectado', 'Real', 'Demora', 'Estado', 'Motivo']];
+            const tableBody = data.map(item => {
+                const status = calculateStatus(item);
+                return [
+                    item.fecha,
+                    item.tipo || '',
+                    `${item.horaMin} - ${item.horaMax}`,
+                    item.horarioReal || '',
+                    item.demoras || '',
+                    status,
+                    item.motivo && item.motivo.trim() !== '' ? item.motivo : '-'
+                ];
+            });
+
+            doc.autoTable({
+                head: tableHead,
+                body: tableBody,
+                startY: yPos,
+                margin: { left: margin, right: margin },
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 3,
+                    textColor: [40, 40, 40],
+                    lineColor: [220, 220, 220],
+                    lineWidth: 0.3,
+                },
+                headStyles: {
+                    fillColor: [29, 29, 31],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    fontSize: 8,
+                },
+                alternateRowStyles: {
+                    fillColor: [248, 248, 248],
+                },
+                didParseCell: function (hookData) {
+                    if (hookData.section === 'body' && hookData.column.index === 5) {
+                        const val = hookData.cell.raw;
+                        if (val === 'FUERA') {
+                            hookData.cell.styles.textColor = [220, 50, 50];
+                            hookData.cell.styles.fontStyle = 'bold';
+                        } else {
+                            hookData.cell.styles.textColor = [30, 150, 80];
+                            hookData.cell.styles.fontStyle = 'bold';
+                        }
+                    }
+                },
+            });
+        }
+
+        // --- Footer ---
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(170, 170, 170);
+            doc.text('SQR Tracker - Operaciones Bancarias', margin, 291);
+            doc.text(`Página ${i} de ${pageCount}`, pdfWidth - margin, 291, { align: 'right' });
+        }
+
+        doc.save(`Proyeccion_Mensual_${filterMonthVal || new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
         console.error('Error generando PDF:', error);
         alert('Hubo un error al generar el PDF.');
