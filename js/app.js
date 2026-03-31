@@ -372,6 +372,163 @@ function updateRiskPrediction() {
     banner.style.display = 'flex';
 }
 
+// ─── PDF helpers ────────────────────────────────────────────────────────────
+
+function classifyStatusPDF(item) {
+    if (item.manualOverride) return 'OK';
+    const eff = timeToMinutes(item.horarioSindemora);
+    const min = timeToMinutes(item.horaMin);
+    const max = timeToMinutes(item.horaMax);
+    if (eff === 0 && min === 0) return 'OK';
+    if (eff >= min && eff <= max) return 'OK';
+    if (eff > max && (eff - max) <= TOLERANCIA_MINUTOS) return 'OK';
+    if (eff < min && (min - eff) <= TOLERANCIA_MINUTOS) return 'OK';
+    return eff > max ? 'FUERA_DEMORA' : 'FUERA_ADELANTO';
+}
+
+function pdfMinsToHHMM(mins) {
+    if (mins == null || isNaN(mins) || mins < 0) return '00:00';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+function safeStr(str) {
+    if (!str) return '';
+    // Fix mojibake: UTF-8 bytes misread as Latin-1 code points
+    return str.normalize('NFC')
+        .replace(/\u00c3\u00a1/g, '\u00e1') // á
+        .replace(/\u00c3\u00a9/g, '\u00e9') // é
+        .replace(/\u00c3\u00ad/g, '\u00ed') // í
+        .replace(/\u00c3\u00b3/g, '\u00f3') // ó
+        .replace(/\u00c3\u00ba/g, '\u00fa') // ú
+        .replace(/\u00c3\u00b1/g, '\u00f1') // ñ
+        .replace(/\u00c3\u0081/g, '\u00c1') // Á
+        .replace(/\u00c3\u0089/g, '\u00c9') // É
+        .replace(/\u00c3\u0093/g, '\u00d3') // Ó
+        .replace(/\u00c3\u009a/g, '\u00da') // Ú
+        .replace(/\u00c3\u0091/g, '\u00d1'); // Ñ
+}
+
+function parseCriticalPathMinutes(motivo) {
+    if (!motivo) return 0;
+    const m = motivo.match(/[Dd]emora total[^:]*:\s*(\d+)\s*min/);
+    return m ? parseInt(m[1], 10) : 0;
+}
+
+function extractProcessesFromMotivo(motivo, fecha) {
+    if (!motivo) return [];
+    const results = [];
+    const re = /El proceso\s+(\d+)\s*[-\u2013]\s*([^\(]+?)(?:\s*\([^\)]*\))?\s*finaliz/gi;
+    let match;
+    while ((match = re.exec(motivo)) !== null) {
+        const id = match[1];
+        const name = match[2].trim();
+        const after = motivo.slice(match.index);
+        const imp = after.match(/afect[oó] al camino cr[ií]tico\s+(\d+)\s*min/i);
+        results.push({ id, name, fecha, impact: imp ? parseInt(imp[1], 10) : 0 });
+    }
+    return results;
+}
+
+function generatePDFChartImage(data, classified) {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 900;
+        canvas.height = 300;
+        canvas.style.cssText = 'position:absolute;left:-9999px;top:-9999px';
+        document.body.appendChild(canvas);
+
+        const labels   = data.map(d => d.fecha.split('-')[2]);
+        const minData  = data.map(d => timeToMinutes(d.horaMin));
+        const maxData  = data.map(d => timeToMinutes(d.horaMax));
+        const realData = data.map(d => timeToMinutes(d.horarioReal));
+        const ptColors = classified.map(d => {
+            if (d._status === 'FUERA_DEMORA')   return '#ef4444';
+            if (d._status === 'FUERA_ADELANTO') return '#f59e0b';
+            return '#22c55e';
+        });
+
+        const ch = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        data: minData,
+                        borderColor: 'transparent',
+                        pointRadius: 0,
+                        fill: false,
+                        order: 3,
+                    },
+                    {
+                        label: 'Rango proyectado',
+                        data: maxData,
+                        borderColor: 'rgba(0,85,255,0.3)',
+                        borderWidth: 1.5,
+                        borderDash: [5, 4],
+                        pointRadius: 0,
+                        fill: '-1',
+                        backgroundColor: 'rgba(0,85,255,0.08)',
+                        order: 2,
+                    },
+                    {
+                        label: 'Ejecucion real',
+                        data: realData,
+                        borderColor: '#0055ff',
+                        borderWidth: 2,
+                        pointBackgroundColor: ptColors,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 1,
+                        pointRadius: 5,
+                        fill: false,
+                        order: 1,
+                    },
+                ],
+            },
+            options: {
+                animation: false,
+                responsive: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            filter: item => item.datasetIndex !== 0,
+                            usePointStyle: true,
+                            boxWidth: 8,
+                            font: { size: 11 },
+                        },
+                    },
+                    tooltip: { enabled: false },
+                },
+                scales: {
+                    x: {
+                        grid: { color: '#f0f0f0' },
+                        ticks: { font: { size: 10 } },
+                    },
+                    y: {
+                        grid: { color: '#f0f0f0' },
+                        ticks: {
+                            font: { size: 10 },
+                            callback: v => pdfMinsToHHMM(v),
+                        },
+                    },
+                },
+            },
+        });
+
+        setTimeout(() => {
+            const img = canvas.toDataURL('image/png');
+            ch.destroy();
+            document.body.removeChild(canvas);
+            resolve(img);
+        }, 150);
+    });
+}
+
+// ─── Main PDF generator ──────────────────────────────────────────────────────
+
 async function generatePDFReport() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -383,131 +540,333 @@ async function generatePDFReport() {
 
     try {
         const data = window.currentChartData || [];
-        const pdfWidth = doc.internal.pageSize.getWidth();
+        const pdfWidth  = doc.internal.pageSize.getWidth();  // 210
+        const pdfHeight = doc.internal.pageSize.getHeight(); // 297
         const margin = 16;
+        const contentW = pdfWidth - margin * 2;
 
-        // --- Título ---
-        doc.setFontSize(26);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(29, 29, 31);
-        doc.text('Proyección Mensual', margin, 22);
-
-        // --- Línea separadora bajo el título ---
-        doc.setDrawColor(220, 220, 220);
-        doc.setLineWidth(0.4);
-        doc.line(margin, 26, pdfWidth - margin, 26);
-
-        // --- Texto de eficacia ---
-        let yPos = 36;
-        const monthsNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-                             'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-        const filterMonthVal = document.getElementById('filterMonth').value; // YYYY-MM
+        // ── Month / effectiveness ──────────────────────────────────────────
+        const MONTHS = ['enero','febrero','marzo','abril','mayo','junio',
+                        'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        const filterMonthVal = document.getElementById('filterMonth').value;
         let mesNombre = '';
         if (filterMonthVal) {
-            const monthIndex = parseInt(filterMonthVal.split('-')[1], 10) - 1;
-            mesNombre = monthsNames[monthIndex] || filterMonthVal;
+            mesNombre = MONTHS[parseInt(filterMonthVal.split('-')[1], 10) - 1] || filterMonthVal;
         } else if (data.length > 0) {
-            const monthIndex = parseInt(data[0].fecha.split('-')[1], 10) - 1;
-            mesNombre = monthsNames[monthIndex] || '';
+            mesNombre = MONTHS[parseInt(data[0].fecha.split('-')[1], 10) - 1] || '';
         }
 
-        const total = data.length;
-        let eficaciaText = '';
-        if (total > 0) {
-            const okDays = data.filter(item => calculateStatus(item) === 'OK').length;
-            const effectiveness = ((okDays / total) * 100).toFixed(1);
-            eficaciaText = `La proyección tuvo una eficacia de ${effectiveness}% el mes de ${mesNombre}.`;
-        } else {
-            eficaciaText = `Proyección del mes de ${mesNombre}.`;
-        }
+        const classified = data.map(item => ({ ...item, _status: classifyStatusPDF(item) }));
+        const total         = classified.length;
+        const okDays        = classified.filter(d => d._status === 'OK').length;
+        const fueraDemora   = classified.filter(d => d._status === 'FUERA_DEMORA');
+        const fueraAdelanto = classified.filter(d => d._status === 'FUERA_ADELANTO');
+        const effectiveness = total > 0 ? ((okDays / total) * 100).toFixed(1) : '0.0';
+        const effNum        = parseFloat(effectiveness);
+
+        // ── Critical path analysis ─────────────────────────────────────────
+        let totalCriticalMins = 0;
+        const processMap = {};
+        fueraDemora.forEach(item => {
+            totalCriticalMins += parseCriticalPathMinutes(item.motivo);
+            extractProcessesFromMotivo(item.motivo, item.fecha).forEach(p => {
+                if (!processMap[p.id]) processMap[p.id] = { name: p.name, dates: [], totalImpact: 0 };
+                processMap[p.id].dates.push(p.fecha);
+                processMap[p.id].totalImpact += p.impact;
+            });
+        });
+        const topProcess = Object.entries(processMap)
+            .sort((a, b) => b[1].dates.length - a[1].dates.length)[0];
+
+        // ── Pre-render chart ───────────────────────────────────────────────
+        const chartImgData = await generatePDFChartImage(data, classified);
+
+        // ════════════════════════════════════════════════════════════════════
+        // PAGE CONTENT
+        // ════════════════════════════════════════════════════════════════════
+
+        let yPos = 20;
+
+        // ── Title ──────────────────────────────────────────────────────────
+        doc.setFontSize(22);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(29, 29, 31);
+        doc.text('Proyecci\u00f3n Mensual', margin, yPos);
+        yPos += 5;
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.4);
+        doc.line(margin, yPos, pdfWidth - margin, yPos);
+        yPos += 8;
+
+        // ── Effectiveness subtitle (colored bold %) ────────────────────────
+        let effR = 185, effG = 28, effB = 28;
+        if (effNum >= 80) { effR = 21;  effG = 128; effB = 61; }
+        else if (effNum >= 60) { effR = 180; effG = 83;  effB = 9; }
 
         doc.setFontSize(11);
+        const p1 = 'La proyecci\u00f3n tuvo una eficacia de ';
+        const p2 = effectiveness + '%';
+        const p3 = ' el mes de ' + mesNombre + '.';
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(80, 80, 80);
-        doc.text(eficaciaText, margin, yPos);
-        yPos += 12;
+        doc.setTextColor(100, 100, 100);
+        doc.text(p1, margin, yPos);
+        const w1 = doc.getTextWidth(p1);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(effR, effG, effB);
+        doc.text(p2, margin + w1, yPos);
+        const w2 = doc.getTextWidth(p2);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 100, 100);
+        doc.text(p3, margin + w1 + w2, yPos);
+        yPos += 10;
 
-        // --- Gráfico ---
-        const chartCanvas = document.getElementById('trendChart');
-        if (chartCanvas) {
-            const chartImgData = chartCanvas.toDataURL('image/png');
-            const chartW = pdfWidth - margin * 2;
-            const chartH = chartW * (chartCanvas.height / chartCanvas.width);
-            const chartRenderH = Math.min(chartH, 120);
-            doc.addImage(chartImgData, 'PNG', margin, yPos, chartW, chartRenderH);
-            yPos += chartRenderH + 8;
-        }
+        // ── KPI cards ─────────────────────────────────────────────────────
+        const cardW  = contentW / 4;
+        const cardH  = 20;
+        const cardGap = 3;
 
-        // --- Tabla ---
+        const kpis = [
+            {
+                label: 'D\u00edas del mes',
+                value: String(total),
+                color: [29, 29, 31],
+            },
+            {
+                label: 'D\u00edas OK',
+                value: String(okDays),
+                color: [21, 128, 61],
+            },
+            {
+                label: 'D\u00edas FUERA',
+                value: `${fueraDemora.length + fueraAdelanto.length}`,
+                sub:   `${fueraDemora.length} demora  \u00b7  ${fueraAdelanto.length} adelanto`,
+                color: fueraDemora.length > 0 ? [185, 28, 28] : [180, 83, 9],
+            },
+            {
+                label: 'Demora cr\u00edtica acum.',
+                value: totalCriticalMins > 0 ? `${totalCriticalMins} min` : (fueraDemora.length > 0 ? 'Ver motivos' : '\u2014'),
+                color: [29, 29, 31],
+            },
+        ];
+
+        kpis.forEach((kpi, i) => {
+            const x = margin + i * (cardW + cardGap / 4);
+            doc.setFillColor(248, 249, 250);
+            doc.setDrawColor(220, 222, 225);
+            doc.setLineWidth(0.3);
+            doc.roundedRect(x, yPos, cardW - 1, cardH, 2, 2, 'FD');
+
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(130, 130, 130);
+            doc.text(kpi.label, x + 4, yPos + 6);
+
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...kpi.color);
+            doc.text(kpi.value, x + 4, yPos + 14);
+
+            if (kpi.sub) {
+                doc.setFontSize(6.5);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(130, 130, 130);
+                doc.text(kpi.sub, x + 4, yPos + 19);
+            }
+        });
+        yPos += cardH + 8;
+
+        // ── Chart ─────────────────────────────────────────────────────────
+        const chartRenderH = 88;
+        doc.addImage(chartImgData, 'PNG', margin, yPos, contentW, chartRenderH);
+        yPos += chartRenderH + 6;
+
+        // ── Main table ────────────────────────────────────────────────────
         if (data.length > 0) {
-            const tableHead = [['Fecha', 'Tipo', 'Proyectado', 'Real', 'Demora', 'Estado', 'Motivo']];
-            const tableBody = data.map(item => {
-                const status = calculateStatus(item);
-                return [
-                    item.fecha,
-                    item.tipo || '',
-                    `${item.horaMin} - ${item.horaMax}`,
-                    item.horarioReal || '',
-                    item.demoras || '',
-                    status,
-                    item.motivo && item.motivo.trim() !== '' ? item.motivo : '-'
-                ];
-            });
+            // Demoras total row
+            const totalDemoMins = classified.reduce((acc, d) => acc + timeToMinutes(d.demoras), 0);
+
+            const tableBody = classified.map(item => [
+                item.fecha,
+                safeStr(item.tipo || ''),
+                `${item.horaMin} - ${item.horaMax}`,
+                item.horarioReal || '',
+                item.demoras || '',
+                item._status,   // used in hooks; text hidden, chip drawn
+                safeStr(item.motivo && item.motivo.trim() ? item.motivo : '\u2014'),
+            ]);
+            // Totals row
+            tableBody.push(['Total', '\u2014', '\u2014', '\u2014', pdfMinsToHHMM(totalDemoMins), '_TOTAL_', '']);
+
+            const totalRowIdx = tableBody.length - 1;
 
             doc.autoTable({
-                head: tableHead,
+                head: [['Fecha', 'Tipo', 'Proyectado', 'Real', 'Demora', 'Estado', 'Motivo']],
                 body: tableBody,
                 startY: yPos,
-                margin: { left: margin, right: margin },
+                margin: { left: margin, right: margin, bottom: 14 },
                 styles: {
-                    fontSize: 8,
-                    cellPadding: 3,
+                    fontSize: 7.5,
+                    cellPadding: { top: 4, right: 3, bottom: 4, left: 3 },
                     textColor: [40, 40, 40],
-                    lineColor: [220, 220, 220],
-                    lineWidth: 0.3,
+                    lineColor: [225, 225, 225],
+                    lineWidth: 0.25,
                     overflow: 'linebreak',
+                    valign: 'middle',
                 },
                 headStyles: {
                     fillColor: [29, 29, 31],
                     textColor: [255, 255, 255],
                     fontStyle: 'bold',
-                    fontSize: 8,
-                },
-                alternateRowStyles: {
-                    fillColor: [248, 248, 248],
+                    fontSize: 7.5,
+                    cellPadding: { top: 4, right: 3, bottom: 4, left: 3 },
                 },
                 columnStyles: {
-                    0: { cellWidth: 24 },  // Fecha
-                    1: { cellWidth: 20 },  // Tipo
-                    2: { cellWidth: 26 },  // Proyectado
-                    3: { cellWidth: 20 },  // Real
-                    4: { cellWidth: 20 },  // Demora
-                    5: { cellWidth: 16 },  // Estado
-                    6: { cellWidth: 'auto' }, // Motivo - ocupa el resto
+                    0: { cellWidth: 22 },
+                    1: { cellWidth: 22 },
+                    2: { cellWidth: 26 },
+                    3: { cellWidth: 19 },
+                    4: { cellWidth: 19 },
+                    5: { cellWidth: 20 },
+                    6: { cellWidth: 'auto' },
                 },
-                didParseCell: function (hookData) {
-                    if (hookData.section === 'body' && hookData.column.index === 5) {
-                        const val = hookData.cell.raw;
-                        if (val === 'FUERA') {
-                            hookData.cell.styles.textColor = [220, 50, 50];
-                            hookData.cell.styles.fontStyle = 'bold';
+                didParseCell: function (d) {
+                    if (d.section !== 'body') return;
+                    const ri = d.row.index;
+
+                    // Totals row
+                    if (ri === totalRowIdx) {
+                        d.cell.styles.fillColor  = [229, 231, 235];
+                        d.cell.styles.fontStyle  = 'bold';
+                        d.cell.styles.textColor  = [50, 50, 50];
+                        return;
+                    }
+
+                    const item = classified[ri];
+                    if (!item) return;
+                    const st = item._status;
+
+                    // Row background
+                    if (st === 'FUERA_DEMORA') {
+                        d.cell.styles.fillColor = [255, 241, 242];
+                    } else if (st === 'FUERA_ADELANTO') {
+                        d.cell.styles.fillColor = [255, 251, 235];
+                    } else {
+                        d.cell.styles.fillColor = ri % 2 === 0 ? [255, 255, 255] : [249, 250, 251];
+                    }
+
+                    // Demora column color scaling
+                    if (d.column.index === 4) {
+                        const dm = timeToMinutes(d.cell.raw);
+                        if (dm === 0) {
+                            d.cell.styles.textColor = [190, 190, 190];
+                        } else if (dm <= 20) {
+                            d.cell.styles.textColor = [21, 128, 61];
+                        } else if (dm <= 60) {
+                            d.cell.styles.textColor = [180, 83, 9];
                         } else {
-                            hookData.cell.styles.textColor = [30, 150, 80];
-                            hookData.cell.styles.fontStyle = 'bold';
+                            d.cell.styles.textColor = [185, 28, 28];
+                            d.cell.styles.fontStyle = 'bold';
                         }
                     }
+
+                    // Status column: hide text (chip drawn in didDrawCell)
+                    if (d.column.index === 5) {
+                        d.cell.styles.textColor = d.cell.styles.fillColor;
+                    }
+                },
+                didDrawCell: function (d) {
+                    if (d.section !== 'body') return;
+                    if (d.column.index !== 5) return;
+                    const ri = d.row.index;
+                    if (ri === totalRowIdx) return;
+
+                    const item = classified[ri];
+                    if (!item) return;
+                    const st = item._status;
+
+                    let chipR, chipG, chipB, chipLabel;
+                    if (st === 'OK') {
+                        chipR = 21; chipG = 128; chipB = 61; chipLabel = 'OK';
+                    } else if (st === 'FUERA_DEMORA') {
+                        chipR = 185; chipG = 28; chipB = 28; chipLabel = 'FUERA';
+                    } else {
+                        chipR = 180; chipG = 83; chipB = 9; chipLabel = 'ADELANTO';
+                    }
+
+                    const cx = d.cell.x + 2;
+                    const cy = d.cell.y + 2;
+                    const cw = d.cell.width - 4;
+                    const ch = d.cell.height - 4;
+
+                    doc.setFillColor(chipR, chipG, chipB);
+                    doc.roundedRect(cx, cy, cw, ch, 1.5, 1.5, 'F');
+
+                    doc.setFontSize(6.5);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(255, 255, 255);
+                    doc.text(chipLabel, cx + cw / 2, cy + ch / 2 + 1, { align: 'center' });
                 },
             });
+
+            yPos = doc.lastAutoTable.finalY + 10;
+
+            // ── Problematic processes table ────────────────────────────────
+            const processRows = Object.entries(processMap)
+                .sort((a, b) => b[1].totalImpact - a[1].totalImpact);
+
+            if (processRows.length > 0) {
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(29, 29, 31);
+                doc.text('Procesos con incidencias en el mes', margin, yPos);
+                yPos += 6;
+
+                doc.autoTable({
+                    head: [['Proceso', 'Nombre', 'Fecha(s)', 'Impacto camino cr\u00edtico']],
+                    body: processRows.map(([id, info]) => [
+                        `#${id}`,
+                        safeStr(info.name),
+                        info.dates.join(', '),
+                        info.totalImpact > 0 ? `${info.totalImpact} min` : '\u2014',
+                    ]),
+                    startY: yPos,
+                    margin: { left: margin, right: margin, bottom: 14 },
+                    styles: {
+                        fontSize: 7.5,
+                        cellPadding: { top: 3.5, right: 3, bottom: 3.5, left: 3 },
+                        textColor: [40, 40, 40],
+                        lineColor: [225, 225, 225],
+                        lineWidth: 0.25,
+                        overflow: 'linebreak',
+                    },
+                    headStyles: {
+                        fillColor: [29, 29, 31],
+                        textColor: [255, 255, 255],
+                        fontStyle: 'bold',
+                        fontSize: 7.5,
+                    },
+                    alternateRowStyles: { fillColor: [249, 250, 251] },
+                    columnStyles: {
+                        0: { cellWidth: 18 },
+                        1: { cellWidth: 60 },
+                        2: { cellWidth: 40 },
+                        3: { cellWidth: 'auto' },
+                    },
+                });
+            }
         }
 
-        // --- Footer ---
+        // ── Footer (all pages) ─────────────────────────────────────────────
         const pageCount = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
             doc.setFontSize(8);
-            doc.setTextColor(170, 170, 170);
-            doc.text('SQR Tracker - Operaciones Bancarias', margin, 291);
-            doc.text(`Página ${i} de ${pageCount}`, pdfWidth - margin, 291, { align: 'right' });
+            doc.setTextColor(180, 180, 180);
+            doc.text('SQR Tracker \u2013 Operaciones Bancarias', margin, pdfHeight - 8);
+            doc.text(`P\u00e1gina ${i} de ${pageCount}`, pdfWidth - margin, pdfHeight - 8, { align: 'right' });
+            doc.setDrawColor(220, 220, 220);
+            doc.setLineWidth(0.3);
+            doc.line(margin, pdfHeight - 12, pdfWidth - margin, pdfHeight - 12);
         }
 
         doc.save(`Proyeccion_Mensual_${filterMonthVal || new Date().toISOString().split('T')[0]}.pdf`);
