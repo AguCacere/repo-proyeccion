@@ -433,8 +433,9 @@ async function generatePDFReport() {
             const chartImgData = chartCanvas.toDataURL('image/png');
             const chartW = pdfWidth - margin * 2;
             const chartH = chartW * (chartCanvas.height / chartCanvas.width);
-            doc.addImage(chartImgData, 'PNG', margin, yPos, chartW, Math.min(chartH, 80));
-            yPos += Math.min(chartH, 80) + 8;
+            const chartRenderH = Math.min(chartH, 120);
+            doc.addImage(chartImgData, 'PNG', margin, yPos, chartW, chartRenderH);
+            yPos += chartRenderH + 8;
         }
 
         // --- Tabla ---
@@ -464,6 +465,7 @@ async function generatePDFReport() {
                     textColor: [40, 40, 40],
                     lineColor: [220, 220, 220],
                     lineWidth: 0.3,
+                    overflow: 'linebreak',
                 },
                 headStyles: {
                     fillColor: [29, 29, 31],
@@ -473,6 +475,15 @@ async function generatePDFReport() {
                 },
                 alternateRowStyles: {
                     fillColor: [248, 248, 248],
+                },
+                columnStyles: {
+                    0: { cellWidth: 24 },  // Fecha
+                    1: { cellWidth: 20 },  // Tipo
+                    2: { cellWidth: 26 },  // Proyectado
+                    3: { cellWidth: 20 },  // Real
+                    4: { cellWidth: 20 },  // Demora
+                    5: { cellWidth: 16 },  // Estado
+                    6: { cellWidth: 'auto' }, // Motivo - ocupa el resto
                 },
                 didParseCell: function (hookData) {
                     if (hookData.section === 'body' && hookData.column.index === 5) {
