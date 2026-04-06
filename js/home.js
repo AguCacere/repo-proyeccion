@@ -171,6 +171,20 @@ function calcKPIs(rows) {
     return { total, withDelayCount: withDelay.length, pctDelay, acumMinutes, avgMinutes };
 }
 
+// ── KPI count-up animation ────────────────────────────────────────────────────
+function animateValue(element, start, end, duration, formatter) {
+    const startTime = performance.now();
+    function update(currentTime) {
+        const elapsed  = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased    = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        const current  = start + (end - start) * eased;
+        element.textContent = formatter(current);
+        if (progress < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+}
+
 // ── Render KPI Cards ──────────────────────────────────────────────────────────
 function _setBadgeClass(id, cls) {
     const el = document.getElementById(id);
@@ -179,15 +193,39 @@ function _setBadgeClass(id, cls) {
 }
 
 function renderKPIs(kpis, prevKpis) {
-    document.getElementById('kpiTotal').textContent = kpis.total;
+    const DURATION = 1200;
 
-    document.getElementById('kpiPct').textContent = `${kpis.pctDelay}%`;
+    // Animate each KPI value
+    animateValue(
+        document.getElementById('kpiTotal'),
+        0, kpis.total, DURATION,
+        n => Math.round(n)
+    );
+
+    animateValue(
+        document.getElementById('kpiPct'),
+        0, kpis.pctDelay, DURATION,
+        n => Math.round(n) + '%'
+    );
+
+    animateValue(
+        document.getElementById('kpiAcum'),
+        0, kpis.acumMinutes, DURATION,
+        n => minutesToHhMm(n)
+    );
+
+    animateValue(
+        document.getElementById('kpiAvg'),
+        0, kpis.avgMinutes, DURATION,
+        n => minutesToHhMm(n)
+    );
+
+    // Badges (set immediately — no animation needed)
     document.getElementById('kpiPctBadge').textContent = `${kpis.withDelayCount} registros`;
     if (prevKpis) {
         _setBadgeClass('kpiPctBadge', kpis.pctDelay > prevKpis.pctDelay ? 'down' : 'up');
     }
 
-    document.getElementById('kpiAcum').textContent = minutesToHhMm(kpis.acumMinutes);
     if (prevKpis) {
         const diff = kpis.acumMinutes - prevKpis.acumMinutes;
         const badge = document.getElementById('kpiAcumBadge');
@@ -197,7 +235,6 @@ function renderKPIs(kpis, prevKpis) {
         _setBadgeClass('kpiAcumBadge', diff > 0 ? 'down' : 'up');
     }
 
-    document.getElementById('kpiAvg').textContent = minutesToHhMm(kpis.avgMinutes);
     if (prevKpis && prevKpis.avgMinutes > 0) {
         const diff = kpis.avgMinutes - prevKpis.avgMinutes;
         const badge = document.getElementById('kpiAvgBadge');
@@ -206,6 +243,14 @@ function renderKPIs(kpis, prevKpis) {
             : `▼ ${minutesToHhMm(Math.abs(diff))} vs período ant.`;
         _setBadgeClass('kpiAvgBadge', diff > 0 ? 'down' : 'up');
     }
+
+    // Re-trigger fadeInUp on the cards so animation plays on every filter apply
+    document.querySelectorAll('.kpi-card').forEach((card, i) => {
+        card.style.animation = 'none';
+        // Force reflow so removing the animation actually takes effect
+        void card.offsetWidth;
+        card.style.animation = `fadeInUp 0.4s ease ${i * 80}ms forwards`;
+    });
 }
 
 // ── Trend chart (always last 6 months — not affected by filter) ───────────────

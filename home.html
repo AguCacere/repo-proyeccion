@@ -40,6 +40,11 @@
             margin-bottom: 28px;
         }
 
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0);   }
+        }
+
         .kpi-card {
             background: #ffffff;
             border-radius: 12px;
@@ -52,7 +57,15 @@
             border: 1px solid #f0f0f0;
             position: relative;
             overflow: hidden;
+            opacity: 0;
+            animation: fadeInUp 0.4s ease forwards;
         }
+
+        /* Staggered initial delays — overridden by JS on filter re-apply */
+        .kpi-card:nth-child(1) { animation-delay:   0ms; }
+        .kpi-card:nth-child(2) { animation-delay:  80ms; }
+        .kpi-card:nth-child(3) { animation-delay: 160ms; }
+        .kpi-card:nth-child(4) { animation-delay: 240ms; }
 
         .kpi-card-body { flex: 1; min-width: 0; }
 
