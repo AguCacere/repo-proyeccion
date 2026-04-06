@@ -112,21 +112,45 @@ function detectShortcut(from, to) {
 }
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
-async function fetchRangeData(from, to) {
+
+// Some records in Supabase store Fecha as DD/MM/YYYY — normalize to YYYY-MM-DD
+// before any comparison (same logic as app.js fetchProjections).
+function normalizeFecha(raw) {
+    if (!raw) return '';
+    if (raw.includes('/')) {
+        const parts = raw.split('/');
+        if (parts.length === 3) {
+            const [d, m, y] = parts;
+            return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+        }
+    }
+    return raw; // already YYYY-MM-DD
+}
+
+// Fetches ALL records then filters client-side on normalized dates.
+// Server-side .gte/.lte cannot be used because Fecha is stored as text and
+// some rows use DD/MM/YYYY, which fails lexicographic comparison against YYYY-MM-DD bounds.
+let _allRowsCache = null;
+
+async function fetchAllRows() {
+    if (_allRowsCache) return _allRowsCache;
     const { data, error } = await supabaseClient
         .from('Estimacion')
-        .select('Fecha, Tipo, Demoras, MotivoDemora')
-        .gte('Fecha', from)
-        .lte('Fecha', to);
-
+        .select('Fecha, Tipo, Demoras, MotivoDemora');
     if (error) { console.error('Supabase error:', error); return []; }
-    return (data || []).map(r => ({
-        fecha: r.Fecha,
+    _allRowsCache = (data || []).map(r => ({
+        fecha: normalizeFecha(r.Fecha),
         tipo: r.Tipo || '',
         demoras: r.Demoras || '',
         motivoDemora: r.MotivoDemora || '',
         demoraMinutes: parseDemoraToMinutes(r.Demoras),
     }));
+    return _allRowsCache;
+}
+
+async function fetchRangeData(from, to) {
+    const all = await fetchAllRows();
+    return all.filter(r => r.fecha >= from && r.fecha <= to);
 }
 
 // Returns the equivalent previous period (same duration, immediately before `from`)
@@ -468,6 +492,7 @@ function initFilter() {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
+    _allRowsCache = null; // fresh fetch on each page load
     initFilter();
 
     // Trend chart is independent — always last 6 months
