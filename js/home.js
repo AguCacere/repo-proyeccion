@@ -355,7 +355,7 @@ function renderTopMotivos(rows) {
 async function renderAIInsight(rows, kpis, from, to) {
     const aiBody      = document.getElementById('aiBody');
     const aiCacheNote = document.getElementById('aiCacheNote');
-    const cacheKey    = `sqr_ai_insight_${from}_${to}`;
+    const cacheKey    = `sqr_ai_insight_v2_${from}_${to}`;
 
     // Check cache
     try {
@@ -395,17 +395,21 @@ async function renderAIInsight(rows, kpis, from, to) {
             body: JSON.stringify({ kpis: kpisTexto, demoras: demorasTexto }),
         });
 
-        if (!resp.ok) throw new Error(`API error ${resp.status}`);
+        if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(`${resp.status} — ${errData.error || 'error desconocido'}${errData.detail ? ': ' + errData.detail : ''}`);
+        }
         const data = await resp.json();
-        const text = data.insight || 'Sin respuesta.';
+        const text = data.insight;
 
         localStorage.setItem(cacheKey, JSON.stringify({ text, ts: Date.now() }));
         aiBody.textContent = text;
         aiCacheNote.textContent = 'Generado ahora · válido 6 horas';
     } catch (err) {
         console.error('AI Insight error:', err);
-        aiBody.textContent = 'No se pudo generar el análisis. Verificá la API key o intentá más tarde.';
-        aiCacheNote.textContent = 'Error al conectar con la API';
+        aiBody.textContent = 'No se pudo generar el análisis.';
+        aiCacheNote.textContent = `Error: ${err.message}`;
+        // Do NOT cache errors — next page load will retry automatically
     }
 }
 
