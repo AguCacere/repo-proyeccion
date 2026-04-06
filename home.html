@@ -408,10 +408,162 @@
         .btn-apply:hover { background: #2563eb; }
         .btn-apply:active { background: #1d4ed8; }
 
+        /* ── Donut charts row ── */
+        .donut-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .donut-layout {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .donut-canvas-wrap {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            flex-shrink: 0;
+        }
+
+        .donut-legend {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .donut-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .donut-color-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .donut-label-name {
+            flex: 1;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: #374151;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .donut-label-time {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #111827;
+            white-space: nowrap;
+        }
+
+        .donut-label-pct {
+            font-size: 0.72rem;
+            color: #9CA3AF;
+            white-space: nowrap;
+        }
+
+        /* ── Detail table ── */
+        .detail-panel { margin-bottom: 24px; }
+
+        .detail-table-wrap { overflow-x: auto; }
+
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: auto;
+        }
+
+        .detail-table th {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #9CA3AF;
+            padding: 0 12px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        .detail-table td {
+            font-size: 0.84rem;
+            color: #374151;
+            padding: 10px 12px;
+            border-bottom: 1px solid #f5f7f9;
+            vertical-align: middle;
+        }
+
+        .detail-table tr:last-child td { border-bottom: none; }
+
+        .detail-table tbody tr:hover td { background: #f8fafc; }
+
+        .detail-table td.fecha-cell {
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            font-weight: 500;
+            color: #111827;
+        }
+
+        .detail-table td.demora-cell {
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .detail-table td.motivo-td {
+            max-width: 280px;
+        }
+
+        /* ── Pagination ── */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            padding-top: 14px;
+            border-top: 1px solid #f0f0f0;
+            margin-top: 4px;
+        }
+
+        .page-btn {
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 5px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #374151;
+            cursor: pointer;
+            transition: all 120ms ease;
+            font-family: inherit;
+        }
+
+        .page-btn:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; }
+
+        .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .page-info {
+            font-size: 0.78rem;
+            color: #6B7280;
+            font-weight: 500;
+        }
+
         /* ── Responsive ── */
         @media (max-width: 900px) {
             .kpi-grid { grid-template-columns: repeat(2, 1fr); }
             .mid-grid  { grid-template-columns: 1fr; }
+            .donut-grid { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 600px) {
@@ -419,6 +571,8 @@
             .home-content { padding: 24px 16px 40px; }
             .filter-inputs-row { flex-direction: column; align-items: stretch; }
             .btn-apply { width: 100%; }
+            .donut-layout { flex-direction: column; }
+            .donut-canvas-wrap { width: 140px; height: 140px; }
         }
     </style>
 </head>
@@ -531,7 +685,33 @@
                 </div>
             </div>
 
-            <!-- Sección 2 + 4: Gráfico + Tabla top motivos -->
+            <!-- Sección 3: Donuts -->
+            <div class="donut-grid">
+                <div class="panel">
+                    <div class="panel-title">Distribución por tipo de proceso</div>
+                    <div class="donut-layout">
+                        <div class="donut-canvas-wrap">
+                            <canvas id="donutTipoChart"></canvas>
+                        </div>
+                        <div class="donut-legend" id="donutTipoLegend">
+                            <div class="empty-state"><span class="es-icon">⏳</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-title">Con demora vs sin demora</div>
+                    <div class="donut-layout">
+                        <div class="donut-canvas-wrap">
+                            <canvas id="donutStatusChart"></canvas>
+                        </div>
+                        <div class="donut-legend" id="donutStatusLegend">
+                            <div class="empty-state"><span class="es-icon">⏳</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección 4: Gráfico + Tabla top motivos -->
             <div class="mid-grid">
                 <!-- Gráfico de tendencia (últimos 6 meses) -->
                 <div class="panel">
@@ -553,7 +733,33 @@
                 </div>
             </div>
 
-            <!-- Sección 3: AI Insight -->
+            <!-- Sección 5: Tabla de detalle -->
+            <div class="panel detail-panel">
+                <div class="panel-title">Detalle del período</div>
+                <div class="detail-table-wrap">
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Tipo</th>
+                                <th>Horario Real</th>
+                                <th>Demora</th>
+                                <th>Motivo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailTableBody">
+                            <tr><td colspan="5" style="text-align:center; color:#9CA3AF; padding: 24px;">Cargando…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <button id="btnPrev" class="page-btn" disabled>← Anterior</button>
+                    <span id="detailPageInfo" class="page-info">Página 1 de 1</span>
+                    <button id="btnNext" class="page-btn" disabled>Siguiente →</button>
+                </div>
+            </div>
+
+            <!-- Sección 6: AI Insight -->
             <div class="ai-panel">
                 <div class="ai-header">
                     <div class="ai-icon-wrap">✦</div>

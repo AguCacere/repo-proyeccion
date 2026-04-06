@@ -135,11 +135,12 @@ async function fetchAllRows() {
     if (_allRowsCache) return _allRowsCache;
     const { data, error } = await supabaseClient
         .from('Estimacion')
-        .select('Fecha, Tipo, Demoras, MotivoDemora');
+        .select('Fecha, Tipo, HorarioReal, Demoras, MotivoDemora');
     if (error) { console.error('Supabase error:', error); return []; }
     _allRowsCache = (data || []).map(r => ({
         fecha: normalizeFecha(r.Fecha),
         tipo: r.Tipo || '',
+        horarioReal: r.HorarioReal || '',
         demoras: r.Demoras || '',
         motivoDemora: r.MotivoDemora || '',
         demoraMinutes: parseDemoraToMinutes(r.Demoras),
@@ -251,6 +252,148 @@ function renderKPIs(kpis, prevKpis) {
         void card.offsetWidth;
         card.style.animation = `fadeInUp 0.4s ease ${i * 80}ms forwards`;
     });
+}
+
+// ── Donut charts ──────────────────────────────────────────────────────────────
+let donutTipoInstance   = null;
+let donutStatusInstance = null;
+
+const DONUT_COLORS = ['#3B82F6','#8B5CF6','#10B981','#F59E0B','#EF4444','#06B6D4'];
+
+// Inline Chart.js plugin to draw center text on doughnut charts
+const centerTextPlugin = {
+    id: 'centerText',
+    beforeDraw(chart) {
+        const cfg = chart.config.options.plugins.centerText;
+        if (!cfg) return;
+        const { ctx, chartArea } = chart;
+        const cx = (chartArea.left + chartArea.right) / 2;
+        const cy = (chartArea.top  + chartArea.bottom) / 2;
+        ctx.save();
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        if (cfg.line1) {
+            ctx.font      = '700 15px Inter, sans-serif';
+            ctx.fillStyle = '#111827';
+            ctx.fillText(cfg.line1, cx, cy - 9);
+        }
+        if (cfg.line2) {
+            ctx.font      = '11px Inter, sans-serif';
+            ctx.fillStyle = '#9CA3AF';
+            ctx.fillText(cfg.line2, cx, cy + 9);
+        }
+        ctx.restore();
+    }
+};
+
+function renderDonutCharts(rows) {
+    // ── Donut A: tiempo acumulado por Tipo ──
+    const tipoMap = {};
+    rows.forEach(r => {
+        if (r.demoraMinutes > 0) {
+            tipoMap[r.tipo] = (tipoMap[r.tipo] || 0) + r.demoraMinutes;
+        }
+    });
+
+    const tipoSorted  = Object.entries(tipoMap).sort((a, b) => b[1] - a[1]);
+    const totalTipoMin = tipoSorted.reduce((s, [, v]) => s + v, 0);
+    const tipoColors  = tipoSorted.map((_, i) => DONUT_COLORS[i % DONUT_COLORS.length]);
+
+    if (donutTipoInstance) donutTipoInstance.destroy();
+    const ctxA = document.getElementById('donutTipoChart').getContext('2d');
+    donutTipoInstance = new Chart(ctxA, {
+        type: 'doughnut',
+        plugins: [centerTextPlugin],
+        data: {
+            labels: tipoSorted.map(([k]) => k),
+            datasets: [{
+                data: tipoSorted.map(([, v]) => v),
+                backgroundColor: tipoColors,
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverBorderColor: '#ffffff',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '68%',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1f2937',
+                    callbacks: { label: ctx => ` ${minutesToHhMm(ctx.parsed)}` }
+                },
+                centerText: {
+                    line1: minutesToHhMm(totalTipoMin),
+                    line2: 'total'
+                }
+            }
+        }
+    });
+
+    const legendA = document.getElementById('donutTipoLegend');
+    legendA.innerHTML = tipoSorted.length === 0
+        ? '<div class="empty-state" style="padding:8px 0">Sin datos</div>'
+        : tipoSorted.map(([tipo, min], i) => {
+            const pct = totalTipoMin > 0 ? Math.round((min / totalTipoMin) * 100) : 0;
+            return `<div class="donut-legend-item">
+                <span class="donut-color-dot" style="background:${tipoColors[i]}"></span>
+                <span class="donut-label-name" title="${_esc(tipo)}">${_esc(tipo)}</span>
+                <span class="donut-label-time">${minutesToHhMm(min)}</span>
+                <span class="donut-label-pct">${pct}%</span>
+            </div>`;
+        }).join('');
+
+    // ── Donut B: con demora vs sin demora ──
+    const withDelay    = rows.filter(r => r.demoraMinutes > 0).length;
+    const withoutDelay = rows.length - withDelay;
+    const pctSin = rows.length > 0 ? Math.round((withoutDelay / rows.length) * 100) : 0;
+    const pctCon = 100 - pctSin;
+
+    if (donutStatusInstance) donutStatusInstance.destroy();
+    const ctxB = document.getElementById('donutStatusChart').getContext('2d');
+    donutStatusInstance = new Chart(ctxB, {
+        type: 'doughnut',
+        plugins: [centerTextPlugin],
+        data: {
+            labels: ['Con demora', 'Sin demora'],
+            datasets: [{
+                data: [withDelay, withoutDelay],
+                backgroundColor: ['#EF4444', '#10B981'],
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverBorderColor: '#ffffff',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '68%',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1f2937',
+                    callbacks: { label: ctx => ` ${ctx.parsed} registros` }
+                },
+                centerText: { line1: `${pctSin}%`, line2: 'sin demora' }
+            }
+        }
+    });
+
+    document.getElementById('donutStatusLegend').innerHTML = `
+        <div class="donut-legend-item">
+            <span class="donut-color-dot" style="background:#EF4444"></span>
+            <span class="donut-label-name">Con demora</span>
+            <span class="donut-label-time">${withDelay} reg.</span>
+            <span class="donut-label-pct">${pctCon}%</span>
+        </div>
+        <div class="donut-legend-item">
+            <span class="donut-color-dot" style="background:#10B981"></span>
+            <span class="donut-label-name">Sin demora</span>
+            <span class="donut-label-time">${withoutDelay} reg.</span>
+            <span class="donut-label-pct">${pctSin}%</span>
+        </div>`;
 }
 
 // ── Trend chart (always last 6 months — not affected by filter) ───────────────
@@ -396,6 +539,48 @@ function renderTopMotivos(rows) {
     `;
 }
 
+// ── Detail table ──────────────────────────────────────────────────────────────
+let _detailRows = [];
+let _detailPage  = 1;
+const DETAIL_PAGE_SIZE = 10;
+
+function renderDetailTable(rows) {
+    _detailRows = [...rows].sort((a, b) => b.fecha.localeCompare(a.fecha));
+    _detailPage = 1;
+    _renderDetailPage();
+}
+
+function _renderDetailPage() {
+    const total      = _detailRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / DETAIL_PAGE_SIZE));
+    const start      = (_detailPage - 1) * DETAIL_PAGE_SIZE;
+    const page       = _detailRows.slice(start, start + DETAIL_PAGE_SIZE);
+    const tbody      = document.getElementById('detailTableBody');
+
+    if (total === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:24px;">Sin registros en este período.</td></tr>`;
+    } else {
+        tbody.innerHTML = page.map(r => {
+            const hasDelay    = r.demoraMinutes > 0;
+            const borderColor = hasDelay ? '#EF4444' : '#10B981';
+            const demoraColor = hasDelay ? '#EF4444' : '#6B7280';
+            return `<tr>
+                <td class="fecha-cell" style="border-left:3px solid ${borderColor};padding-left:13px">${r.fecha}</td>
+                <td>${_esc(r.tipo)}</td>
+                <td style="font-variant-numeric:tabular-nums">${r.horarioReal || '—'}</td>
+                <td class="demora-cell" style="color:${demoraColor}">${hasDelay ? minutesToHhMm(r.demoraMinutes) : '—'}</td>
+                <td class="motivo-td">
+                    <span class="motivo-text" title="${_esc(r.motivoDemora)}">${_esc(r.motivoDemora) || '—'}</span>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    document.getElementById('detailPageInfo').textContent = `Página ${_detailPage} de ${totalPages}`;
+    document.getElementById('btnPrev').disabled = _detailPage <= 1;
+    document.getElementById('btnNext').disabled = _detailPage >= totalPages;
+}
+
 // ── AI Insight ────────────────────────────────────────────────────────────────
 async function renderAIInsight(rows, kpis, from, to) {
     const aiBody      = document.getElementById('aiBody');
@@ -494,7 +679,9 @@ async function applyFilter() {
     const prevKpis = calcKPIs(prevRows);
 
     renderKPIs(kpis, prevKpis);
+    renderDonutCharts(currentRows);
     renderTopMotivos(currentRows);
+    renderDetailTable(currentRows);
     await renderAIInsight(currentRows, kpis, from, to);
 }
 
@@ -533,6 +720,15 @@ function initFilter() {
         activeFrom = from;
         activeTo   = to;
         applyFilter();
+    });
+
+    // Pagination for detail table
+    document.getElementById('btnPrev').addEventListener('click', () => {
+        if (_detailPage > 1) { _detailPage--; _renderDetailPage(); }
+    });
+    document.getElementById('btnNext').addEventListener('click', () => {
+        const totalPages = Math.ceil(_detailRows.length / DETAIL_PAGE_SIZE);
+        if (_detailPage < totalPages) { _detailPage++; _renderDetailPage(); }
     });
 }
 
