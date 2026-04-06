@@ -624,92 +624,6 @@
             white-space: nowrap;
         }
 
-        /* ── Detail table ── */
-        .detail-panel { margin-bottom: 24px; }
-
-        .detail-table-wrap { overflow-x: auto; }
-
-        .detail-table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: auto;
-        }
-
-        .detail-table th {
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: #9CA3AF;
-            padding: 0 12px 12px;
-            border-bottom: 1px solid #f0f0f0;
-            text-align: left;
-            white-space: nowrap;
-        }
-
-        .detail-table td {
-            font-size: 0.84rem;
-            color: #374151;
-            padding: 10px 12px;
-            border-bottom: 1px solid #f5f7f9;
-            vertical-align: middle;
-        }
-
-        .detail-table tr:last-child td { border-bottom: none; }
-
-        .detail-table tbody tr:hover td { background: #f8fafc; }
-
-        .detail-table td.fecha-cell {
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-            font-weight: 500;
-            color: #111827;
-        }
-
-        .detail-table td.demora-cell {
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-
-        .detail-table td.motivo-td {
-            max-width: 280px;
-        }
-
-        /* ── Pagination ── */
-        .pagination {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 12px;
-            padding-top: 14px;
-            border-top: 1px solid #f0f0f0;
-            margin-top: 4px;
-        }
-
-        .page-btn {
-            font-size: 0.8rem;
-            font-weight: 500;
-            padding: 5px 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            background: #ffffff;
-            color: #374151;
-            cursor: pointer;
-            transition: all 120ms ease;
-            font-family: inherit;
-        }
-
-        .page-btn:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; }
-
-        .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
-        .page-info {
-            font-size: 0.78rem;
-            color: #6B7280;
-            font-weight: 500;
-        }
-
         /* ── Responsive ── */
         @media (max-width: 900px) {
             .kpi-grid { grid-template-columns: repeat(2, 1fr); }
@@ -896,33 +810,7 @@
                 </div>
             </div>
 
-            <!-- Sección 5: Tabla de detalle -->
-            <div class="panel detail-panel">
-                <div class="panel-title">Detalle del período</div>
-                <div class="detail-table-wrap">
-                    <table class="detail-table">
-                        <thead>
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Tipo</th>
-                                <th>Horario Real</th>
-                                <th>Demora</th>
-                                <th>Motivo</th>
-                            </tr>
-                        </thead>
-                        <tbody id="detailTableBody">
-                            <tr><td colspan="5" style="text-align:center; color:#9CA3AF; padding: 24px;">Cargando…</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="pagination">
-                    <button id="btnPrev" class="page-btn" disabled>← Anterior</button>
-                    <span id="detailPageInfo" class="page-info">Página 1 de 1</span>
-                    <button id="btnNext" class="page-btn" disabled>Siguiente →</button>
-                </div>
-            </div>
-
-            <!-- Sección 6: AI Insight -->
+            <!-- Sección 5: AI Insight -->
             <div class="ai-panel">
                 <div class="ai-header">
                     <div class="ai-icon-wrap">✦</div>

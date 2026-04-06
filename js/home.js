@@ -307,6 +307,29 @@ function prevPeriodRange(from, to) {
     return { from: prevFrom, to: prevTo };
 }
 
+// Human-readable label for the previous period (used in KPI badges)
+function buildPrevPeriodLabel(from, to) {
+    const [fy, fm] = from.split('-').map(Number);
+    const [ty, tm] = to.split('-').map(Number);
+
+    // Full year
+    if (from === `${fy}-01-01` && to === `${fy}-12-31` && fy === ty) {
+        return `vs ${fy - 1}`;
+    }
+    // Full month
+    if (fy === ty && fm === tm &&
+        from === firstDayOfMonth(fy, fm) &&
+        to   === lastDayOfMonth(ty, tm)) {
+        const d  = new Date(fy, fm - 2, 1);
+        const mn = MONTH_NAMES_FULL_ES[d.getMonth()];
+        return `vs ${mn.charAt(0).toUpperCase() + mn.slice(1)} ${d.getFullYear()}`;
+    }
+    // Custom range: equal duration, show DD/MM – DD/MM
+    const prev = prevPeriodRange(from, to);
+    const fmt  = s => s.split('-').slice(1).reverse().join('/'); // YYYY-MM-DD → DD/MM
+    return `vs ${fmt(prev.from)} – ${fmt(prev.to)}`;
+}
+
 // ── KPI calculation ───────────────────────────────────────────────────────────
 function calcKPIs(rows) {
     const total = rows.length;
@@ -339,7 +362,7 @@ function _setBadgeClass(id, cls) {
     el.classList.add(cls);
 }
 
-function renderKPIs(kpis, prevKpis) {
+function renderKPIs(kpis, prevKpis, prevLabel) {
     const DURATION = 1200;
 
     // Animate each KPI value
@@ -377,8 +400,8 @@ function renderKPIs(kpis, prevKpis) {
         const diff = kpis.acumMinutes - prevKpis.acumMinutes;
         const badge = document.getElementById('kpiAcumBadge');
         badge.textContent = diff >= 0
-            ? `▲ ${minutesToHhMm(Math.abs(diff))} vs período ant.`
-            : `▼ ${minutesToHhMm(Math.abs(diff))} vs período ant.`;
+            ? `▲ ${minutesToHhMm(Math.abs(diff))} ${prevLabel}`
+            : `▼ ${minutesToHhMm(Math.abs(diff))} ${prevLabel}`;
         _setBadgeClass('kpiAcumBadge', diff > 0 ? 'down' : 'up');
     }
 
@@ -386,8 +409,8 @@ function renderKPIs(kpis, prevKpis) {
         const diff = kpis.avgMinutes - prevKpis.avgMinutes;
         const badge = document.getElementById('kpiAvgBadge');
         badge.textContent = diff >= 0
-            ? `▲ ${minutesToHhMm(Math.abs(diff))} vs período ant.`
-            : `▼ ${minutesToHhMm(Math.abs(diff))} vs período ant.`;
+            ? `▲ ${minutesToHhMm(Math.abs(diff))} ${prevLabel}`
+            : `▼ ${minutesToHhMm(Math.abs(diff))} ${prevLabel}`;
         _setBadgeClass('kpiAvgBadge', diff > 0 ? 'down' : 'up');
     }
 
@@ -685,48 +708,6 @@ function renderTopMotivos(rows) {
     `;
 }
 
-// ── Detail table ──────────────────────────────────────────────────────────────
-let _detailRows = [];
-let _detailPage  = 1;
-const DETAIL_PAGE_SIZE = 10;
-
-function renderDetailTable(rows) {
-    _detailRows = [...rows].sort((a, b) => b.fecha.localeCompare(a.fecha));
-    _detailPage = 1;
-    _renderDetailPage();
-}
-
-function _renderDetailPage() {
-    const total      = _detailRows.length;
-    const totalPages = Math.max(1, Math.ceil(total / DETAIL_PAGE_SIZE));
-    const start      = (_detailPage - 1) * DETAIL_PAGE_SIZE;
-    const page       = _detailRows.slice(start, start + DETAIL_PAGE_SIZE);
-    const tbody      = document.getElementById('detailTableBody');
-
-    if (total === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:24px;">Sin registros en este período.</td></tr>`;
-    } else {
-        tbody.innerHTML = page.map(r => {
-            const hasDelay    = r.demoraMinutes > 0;
-            const borderColor = hasDelay ? '#EF4444' : '#10B981';
-            const demoraColor = hasDelay ? '#EF4444' : '#6B7280';
-            return `<tr>
-                <td class="fecha-cell" style="border-left:3px solid ${borderColor};padding-left:13px">${r.fecha}</td>
-                <td>${_esc(r.tipo)}</td>
-                <td style="font-variant-numeric:tabular-nums">${r.horarioReal || '—'}</td>
-                <td class="demora-cell" style="color:${demoraColor}">${hasDelay ? minutesToHhMm(r.demoraMinutes) : '—'}</td>
-                <td class="motivo-td">
-                    <span class="motivo-text" title="${_esc(r.motivoDemora)}">${_esc(r.motivoDemora) || '—'}</span>
-                </td>
-            </tr>`;
-        }).join('');
-    }
-
-    document.getElementById('detailPageInfo').textContent = `Página ${_detailPage} de ${totalPages}`;
-    document.getElementById('btnPrev').disabled = _detailPage <= 1;
-    document.getElementById('btnNext').disabled = _detailPage >= totalPages;
-}
-
 // ── AI Insight ────────────────────────────────────────────────────────────────
 async function renderAIInsight(rows, kpis, from, to) {
     const aiBody      = document.getElementById('aiBody');
@@ -824,10 +805,10 @@ async function applyFilter() {
     const kpis     = calcKPIs(currentRows);
     const prevKpis = calcKPIs(prevRows);
 
-    renderKPIs(kpis, prevKpis);
+    const prevLabel = buildPrevPeriodLabel(from, to);
+    renderKPIs(kpis, prevKpis, prevLabel);
     renderDonutCharts(currentRows);
     renderTopMotivos(currentRows);
-    renderDetailTable(currentRows);
     await renderAIInsight(currentRows, kpis, from, to);
 }
 
@@ -869,14 +850,6 @@ function initFilter() {
         applyFilter();
     });
 
-    // Pagination for detail table
-    document.getElementById('btnPrev').addEventListener('click', () => {
-        if (_detailPage > 1) { _detailPage--; _renderDetailPage(); }
-    });
-    document.getElementById('btnNext').addEventListener('click', () => {
-        const totalPages = Math.ceil(_detailRows.length / DETAIL_PAGE_SIZE);
-        if (_detailPage < totalPages) { _detailPage++; _renderDetailPage(); }
-    });
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
