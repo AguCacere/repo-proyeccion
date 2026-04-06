@@ -140,9 +140,10 @@ function prevPeriodRange(from, to) {
 // ── KPI calculation ───────────────────────────────────────────────────────────
 function calcKPIs(rows) {
     const total = rows.length;
+    // Exclude records where Demoras is '00:00:00', null or '' (demoraMinutes === 0)
     const withDelay = rows.filter(r => r.demoraMinutes > 0);
     const pctDelay = total > 0 ? Math.round((withDelay.length / total) * 100) : 0;
-    const acumMinutes = rows.reduce((s, r) => s + r.demoraMinutes, 0);
+    const acumMinutes = withDelay.reduce((s, r) => s + r.demoraMinutes, 0);
     const avgMinutes = withDelay.length > 0 ? acumMinutes / withDelay.length : 0;
     return { total, withDelayCount: withDelay.length, pctDelay, acumMinutes, avgMinutes };
 }
@@ -192,19 +193,38 @@ async function loadAndRenderTrendChart() {
     const year  = now.getFullYear();
     const month = now.getMonth() + 1;
 
-    // Build 6 months back
+    // Build 6-month list (oldest → newest)
     const months = [];
     for (let i = 5; i >= 0; i--) {
         const d = new Date(year, month - 1 - i, 1);
         months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
     }
 
-    const results = await Promise.all(
-        months.map(m => fetchRangeData(firstDayOfMonth(m.year, m.month), lastDayOfMonth(m.year, m.month)))
-    );
+    // Single query spanning the full 6-month window
+    const rangeFrom = firstDayOfMonth(months[0].year, months[0].month);
+    const rangeTo   = lastDayOfMonth(months[months.length - 1].year, months[months.length - 1].month);
+    const allRows   = await fetchRangeData(rangeFrom, rangeTo);
+
+    console.log(`[Tendencia] Registros traídos (${rangeFrom} → ${rangeTo}): ${allRows.length}`, allRows);
+
+    // Group client-side by YYYY-MM using Fecha.substring(0, 7)
+    // Exclude records where Demoras is '00:00:00', null or '' (demoraMinutes === 0)
+    const byMonth = {};
+    months.forEach(m => {
+        byMonth[`${m.year}-${String(m.month).padStart(2, '0')}`] = 0;
+    });
+
+    allRows.forEach(r => {
+        const key = (r.fecha || '').substring(0, 7); // e.g. "2026-02"
+        if (key in byMonth && r.demoraMinutes > 0) {
+            byMonth[key] += r.demoraMinutes;
+        }
+    });
+
+    console.log('[Tendencia] Minutos acumulados por mes:', byMonth);
 
     const labels = months.map(m => MONTH_NAMES_ES[m.month - 1]);
-    const values = results.map(rows => calcKPIs(rows).acumMinutes);
+    const values = months.map(m => byMonth[`${m.year}-${String(m.month).padStart(2, '0')}`] || 0);
 
     const ctx = document.getElementById('trendChart').getContext('2d');
     if (trendChartInstance) trendChartInstance.destroy();
