@@ -272,6 +272,18 @@ function _createDayPicker({ wrapperId, hiddenInputId, displayId, triggerId }) {
     };
 }
 
+// ── Tipo cleanup (mirrors app.js logic) ──────────────────────────────────────
+// Supabase stores some Tipo values with encoding artifacts (e.g. "Hbil", "Da").
+// Apply the same regex fixes used in app.js before storing in the cache.
+function _cleanTipo(raw) {
+    if (!raw || !raw.trim()) return 'Sin especificar';
+    let t = raw.trim()
+        .replace(/H[áà]?bil/g, 'Hábil')
+        .replace(/D[íì]?a/g, 'Día');
+    if (t === 'Da' || t.startsWith('D a')) t = 'Día';
+    return t;
+}
+
 // Fetches ALL records then filters client-side on normalized dates.
 // Server-side .gte/.lte cannot be used because Fecha is stored as text and
 // some rows use DD/MM/YYYY, which fails lexicographic comparison against YYYY-MM-DD bounds.
@@ -295,7 +307,7 @@ async function fetchAllRows() {
     if (error) { console.error('Supabase error:', error); throw new Error(error.message); }
     _allRowsCache = (data || []).map(r => ({
         fecha: normalizeFecha(r.Fecha),
-        tipo: r.Tipo || '',
+        tipo: _cleanTipo(r.Tipo),
         horarioReal: r.HorarioReal || '',
         demoras: r.Demoras || '',
         motivoDemora: r.MotivoDemora || '',
@@ -470,7 +482,8 @@ function renderDonutCharts(rows) {
     const tipoMap = {};
     rows.forEach(r => {
         if (r.demoraMinutes > 0) {
-            tipoMap[r.tipo] = (tipoMap[r.tipo] || 0) + r.demoraMinutes;
+            const tipo = (r.tipo && r.tipo.trim()) ? r.tipo.trim() : 'Sin especificar';
+            tipoMap[tipo] = (tipoMap[tipo] || 0) + r.demoraMinutes;
         }
     });
 
