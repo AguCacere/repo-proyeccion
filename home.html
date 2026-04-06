@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio — Proyección Mensual</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ── Page background ── */
+        body { background-color: #f8f9fa; }
+
+        .home-content {
+            padding: 40px 40px 60px;
+        }
+
+        .home-header {
+            margin-bottom: 32px;
+        }
+
+        .home-header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .home-header p {
+            font-size: 0.875rem;
+            color: #6B7280;
+        }
+
+        /* ── KPI Grid ── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .kpi-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 20px 20px 18px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            border: 1px solid #f0f0f0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card-body { flex: 1; min-width: 0; }
+
+        .kpi-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #9CA3AF;
+            margin-bottom: 8px;
+        }
+
+        .kpi-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #111827;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .kpi-value.skeleton {
+            background: #e5e7eb;
+            border-radius: 6px;
+            height: 1.75rem;
+            width: 70%;
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+
+        .kpi-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 20px;
+        }
+
+        .kpi-badge.up   { background: #dcfce7; color: #16a34a; }
+        .kpi-badge.down { background: #fee2e2; color: #dc2626; }
+        .kpi-badge.neutral { background: #f3f4f6; color: #6B7280; }
+
+        .kpi-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .kpi-icon.blue   { background: #eff6ff; }
+        .kpi-icon.amber  { background: #fffbeb; }
+        .kpi-icon.red    { background: #fef2f2; }
+        .kpi-icon.green  { background: #f0fdf4; }
+
+        /* ── Middle row: chart + table ── */
+        .mid-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .panel {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid #f0f0f0;
+        }
+
+        .panel-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #9CA3AF;
+            margin-bottom: 20px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 200px;
+        }
+
+        /* ── Top motivos table ── */
+        .top-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .top-table th {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #9CA3AF;
+            text-align: left;
+            padding: 0 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .top-table td {
+            font-size: 0.84rem;
+            color: #374151;
+            padding: 10px 8px;
+            border-bottom: 1px solid #f9fafb;
+        }
+
+        .top-table tr:last-child td { border-bottom: none; }
+
+        .top-table tbody tr:hover td { background: #f9fafb; }
+
+        .top-table td.motivo-cell {
+            font-weight: 500;
+            color: #111827;
+            max-width: 160px;
+        }
+
+        .motivo-text {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .top-table td.num-cell {
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+        }
+
+        .rank-badge {
+            display: inline-flex;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #f3f4f6;
+            color: #6B7280;
+            font-size: 0.68rem;
+            font-weight: 700;
+            align-items: center;
+            justify-content: center;
+            margin-right: 6px;
+        }
+
+        .rank-badge.top1 { background: #fef3c7; color: #d97706; }
+        .rank-badge.top2 { background: #f0fdf4; color: #16a34a; }
+        .rank-badge.top3 { background: #eff6ff; color: #2563eb; }
+
+        /* ── Empty state ── */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 0;
+            color: #9CA3AF;
+            font-size: 0.84rem;
+            gap: 8px;
+        }
+
+        .empty-state .es-icon { font-size: 2rem; }
+
+        /* ── AI Insight ── */
+        .ai-panel {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid #f0f0f0;
+            margin-bottom: 0;
+        }
+
+        .ai-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .ai-icon-wrap {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .ai-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .ai-subtitle {
+            font-size: 0.72rem;
+            color: #9CA3AF;
+        }
+
+        .ai-body {
+            font-size: 0.875rem;
+            color: #374151;
+            line-height: 1.65;
+        }
+
+        /* Skeleton for AI */
+        .ai-skeleton {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .sk-line {
+            background: #e5e7eb;
+            border-radius: 4px;
+            height: 14px;
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+
+        .sk-line:nth-child(2) { width: 90%; animation-delay: 0.1s; }
+        .sk-line:nth-child(3) { width: 80%; animation-delay: 0.2s; }
+        .sk-line:nth-child(4) { width: 60%; animation-delay: 0.3s; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.45; }
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .mid-grid  { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 600px) {
+            .kpi-grid { grid-template-columns: 1fr; }
+            .home-content { padding: 24px 16px 40px; }
+        }
+    </style>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="logo">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+            </svg>
+            <span>Proyección v1</span>
+        </div>
+        <nav>
+            <div class="nav-section-label">Menú</div>
+            <ul class="nav-menu">
+                <li class="nav-item active" onclick="location.href='home.html'">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <span>Inicio</span>
+                </li>
+                <li class="nav-item" onclick="location.href='index.html'">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    <span>Dashboard</span>
+                </li>
+                <li class="nav-item" onclick="alert('Histórico en desarrollo')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>Histórico</span>
+                </li>
+                <li class="nav-item" onclick="location.href='monitoreo.html'">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <span>Monitoreo</span>
+                </li>
+                <li class="nav-item" onclick="alert('Configuración en desarrollo')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>Configuración</span>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="home-content">
+
+            <!-- Header -->
+            <div class="home-header">
+                <h1 id="pageTitle">Inicio</h1>
+                <p id="pageSubtitle">Cargando datos del mes actual…</p>
+            </div>
+
+            <!-- Sección 1: KPI Cards -->
+            <div class="kpi-grid">
+                <!-- Total registros -->
+                <div class="kpi-card">
+                    <div class="kpi-card-body">
+                        <div class="kpi-label">Total registros</div>
+                        <div class="kpi-value" id="kpiTotal">—</div>
+                        <span class="kpi-badge neutral" id="kpiTotalBadge">mes actual</span>
+                    </div>
+                    <div class="kpi-icon blue">📋</div>
+                </div>
+
+                <!-- Registros con demora -->
+                <div class="kpi-card">
+                    <div class="kpi-card-body">
+                        <div class="kpi-label">Con demora</div>
+                        <div class="kpi-value" id="kpiPct">—</div>
+                        <span class="kpi-badge neutral" id="kpiPctBadge">del total</span>
+                    </div>
+                    <div class="kpi-icon amber">⚠️</div>
+                </div>
+
+                <!-- Tiempo acumulado -->
+                <div class="kpi-card">
+                    <div class="kpi-card-body">
+                        <div class="kpi-label">Tiempo acumulado</div>
+                        <div class="kpi-value" id="kpiAcum">—</div>
+                        <span class="kpi-badge neutral" id="kpiAcumBadge">vs mes anterior</span>
+                    </div>
+                    <div class="kpi-icon red">⏱️</div>
+                </div>
+
+                <!-- Promedio de demora -->
+                <div class="kpi-card">
+                    <div class="kpi-card-body">
+                        <div class="kpi-label">Promedio demora</div>
+                        <div class="kpi-value" id="kpiAvg">—</div>
+                        <span class="kpi-badge neutral" id="kpiAvgBadge">solo con demora</span>
+                    </div>
+                    <div class="kpi-icon green">📊</div>
+                </div>
+            </div>
+
+            <!-- Sección 2 + 4: Gráfico + Tabla top motivos -->
+            <div class="mid-grid">
+                <!-- Gráfico de tendencia (últimos 6 meses) -->
+                <div class="panel">
+                    <div class="panel-title">Tendencia de demoras — últimos 6 meses</div>
+                    <div class="chart-wrapper">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Top 5 motivos -->
+                <div class="panel">
+                    <div class="panel-title">Top motivos de demora — mes actual</div>
+                    <div id="topMotivosContainer">
+                        <div class="empty-state">
+                            <span class="es-icon">⏳</span>
+                            Cargando datos…
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección 3: AI Insight -->
+            <div class="ai-panel">
+                <div class="ai-header">
+                    <div class="ai-icon-wrap">✦</div>
+                    <div>
+                        <div class="ai-title">AI Insight — Análisis de demoras</div>
+                        <div class="ai-subtitle" id="aiCacheNote">Generando análisis…</div>
+                    </div>
+                </div>
+                <div class="ai-body" id="aiBody">
+                    <div class="ai-skeleton">
+                        <div class="sk-line"></div>
+                        <div class="sk-line"></div>
+                        <div class="sk-line"></div>
+                        <div class="sk-line"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /.home-content -->
+    </main>
+
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/home.js"></script>
+</body>
+</html>
