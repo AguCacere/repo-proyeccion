@@ -279,10 +279,20 @@ let _allRowsCache = null;
 
 async function fetchAllRows() {
     if (_allRowsCache) return _allRowsCache;
-    const { data, error } = await supabaseClient
-        .from('Estimacion')
-        .select('Fecha, Tipo, HorarioReal, Demoras, MotivoDemora');
-    if (error) { console.error('Supabase error:', error); return []; }
+
+    let result;
+    try {
+        result = await Promise.race([
+            supabaseClient.from('Estimacion').select('Fecha, Tipo, HorarioReal, Demoras, MotivoDemora'),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout: Supabase no respondió en 15s')), 15000)),
+        ]);
+    } catch (err) {
+        console.error('[fetchAllRows]', err);
+        throw err; // re-throw so applyFilter can catch and show error
+    }
+
+    const { data, error } = result;
+    if (error) { console.error('Supabase error:', error); throw new Error(error.message); }
     _allRowsCache = (data || []).map(r => ({
         fecha: normalizeFecha(r.Fecha),
         tipo: r.Tipo || '',
@@ -796,20 +806,30 @@ async function applyFilter() {
     });
 
     // Fetch current range + previous period in parallel
-    const prev = prevPeriodRange(from, to);
-    const [currentRows, prevRows] = await Promise.all([
-        fetchRangeData(from, to),
-        fetchRangeData(prev.from, prev.to),
-    ]);
+    try {
+        const prev = prevPeriodRange(from, to);
+        const [currentRows, prevRows] = await Promise.all([
+            fetchRangeData(from, to),
+            fetchRangeData(prev.from, prev.to),
+        ]);
 
-    const kpis     = calcKPIs(currentRows);
-    const prevKpis = calcKPIs(prevRows);
+        const kpis     = calcKPIs(currentRows);
+        const prevKpis = calcKPIs(prevRows);
 
-    const prevLabel = buildPrevPeriodLabel(from, to);
-    renderKPIs(kpis, prevKpis, prevLabel);
-    renderDonutCharts(currentRows);
-    renderTopMotivos(currentRows);
-    await renderAIInsight(currentRows, kpis, from, to);
+        const prevLabel = buildPrevPeriodLabel(from, to);
+        renderKPIs(kpis, prevKpis, prevLabel);
+        renderDonutCharts(currentRows);
+        renderTopMotivos(currentRows);
+        await renderAIInsight(currentRows, kpis, from, to);
+    } catch (err) {
+        console.error('[applyFilter] Error cargando datos:', err);
+        // Show visible error so it doesn't silently stay in loading state
+        document.getElementById('topMotivosContainer').innerHTML =
+            `<div class="empty-state"><span class="es-icon">⚠️</span>Error al cargar datos.<br><small style="color:#9CA3AF">${err.message}</small></div>`;
+        document.querySelectorAll('.kpi-value').forEach(el => { el.textContent = 'Error'; });
+        document.getElementById('aiCacheNote').textContent = `Error: ${err.message}`;
+        document.getElementById('aiBody').textContent = 'No se pudieron cargar los datos.';
+    }
 }
 
 // ── Filter UI wiring ──────────────────────────────────────────────────────────
