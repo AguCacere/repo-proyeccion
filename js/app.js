@@ -1,5 +1,18 @@
 // Configuración Global
 const TOLERANCIA_MINUTOS = 3;
+
+// ── Animación count-up (compartida por todas las páginas) ─────────────────────
+function animateValue(element, start, end, duration, formatter) {
+    const startTime = performance.now();
+    function update(currentTime) {
+        const elapsed  = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased    = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        element.textContent = formatter(start + (end - start) * eased);
+        if (progress < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+}
 let chartInstance = null;
 let currentEditIndex = null;
 let sortState = {
@@ -1061,18 +1074,26 @@ function renderStats(data) {
     const total = data.length;
     if (total === 0) return;
 
-    const okDays = data.filter(item => calculateStatus(item) === "OK").length;
-    const failDays = total - okDays;
-    const effectiveness = ((okDays / total) * 100).toFixed(1);
-
-    document.getElementById('avgEffectiveness').innerText = `${effectiveness}%`;
-    document.getElementById('daysOk').innerText = okDays;
-    document.getElementById('daysFail').innerText = failDays;
-
-    // Calcular demora promedio (en minutos)
+    const okDays      = data.filter(item => calculateStatus(item) === "OK").length;
+    const failDays    = total - okDays;
+    const effectiveness = (okDays / total) * 100;
     const totalDelayMin = data.reduce((acc, item) => acc + timeToMinutes(item.demoras), 0);
-    const avgDelay = (totalDelayMin / total).toFixed(0);
-    document.getElementById('avgDelay').innerText = `${avgDelay} min`;
+    const avgDelayRaw   = totalDelayMin / total;
+
+    const DURATION = 1200;
+    animateValue(document.getElementById('avgEffectiveness'), 0, effectiveness, DURATION,
+        n => n.toFixed(1) + '%');
+    animateValue(document.getElementById('daysOk'),  0, okDays,      DURATION, n => Math.round(n));
+    animateValue(document.getElementById('daysFail'), 0, failDays,    DURATION, n => Math.round(n));
+    animateValue(document.getElementById('avgDelay'), 0, avgDelayRaw, DURATION,
+        n => Math.round(n) + ' min');
+
+    // Re-trigger fadeInUp on each stat card
+    document.querySelectorAll('.stat-card').forEach((card, i) => {
+        card.style.animation = 'none';
+        void card.offsetWidth; // force reflow
+        card.style.animation = `fadeInUp 0.4s ease ${i * 80}ms forwards`;
+    });
 }
 
 function renderTable(data) {
@@ -2290,14 +2311,26 @@ async function renderMonitoringPage(currentMonth, previousMonth) {
                 </div>
                 <div class="monitoring-kpi-card standard">
                     <span class="label">Promedio Global</span>
-                    <span class="value standard">${minutesToHHMM(globalAvg)}</span>
+                    <span class="value standard" id="monGlobalAvg">${minutesToHHMM(globalAvg)}</span>
                 </div>
                 <div class="monitoring-kpi-card standard">
                     <span class="label">Total Registros</span>
-                    <span class="value standard">${totalRecords}</span>
+                    <span class="value standard" id="monTotalRecords">${totalRecords}</span>
                 </div>
             </div>
         `;
+
+        // Animate numeric values and trigger fadeInUp on monitoring KPI cards
+        const avgEl   = document.getElementById('monGlobalAvg');
+        const totalEl = document.getElementById('monTotalRecords');
+        if (avgEl)   animateValue(avgEl,   0, globalAvg,    1200, n => minutesToHHMM(Math.round(n)));
+        if (totalEl) animateValue(totalEl, 0, totalRecords, 1200, n => Math.round(n));
+
+        kpiContainer.querySelectorAll('.monitoring-kpi-card').forEach((card, i) => {
+            card.style.animation = 'none';
+            void card.offsetWidth;
+            card.style.animation = `fadeInUp 0.4s ease ${i * 80}ms forwards`;
+        });
     }
 
     // Segundo pase: Renderizar tarjetas de grupo
