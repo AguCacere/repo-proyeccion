@@ -1402,55 +1402,65 @@ tr:hover .action-group {
 }
 
 .custom-month-trigger {
-    border: 1px solid #D1D5DB;
+    border: 1px solid #e2e8f0;
     border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 14px;
-    background: #FFFFFF;
+    padding: 7px 12px;
+    font-size: 0.84rem;
+    font-weight: 500;
+    background: #ffffff;
+    color: #374151;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: all 0.2s ease;
-    height: 38px;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+    height: 36px;
     width: 100%;
+    font-family: inherit;
+}
+
+.custom-month-trigger:hover {
+    border-color: #cbd5e1;
 }
 
 .custom-month-trigger.active {
-    border-color: #2563EB;
-    box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+    outline: none;
 }
 
 .custom-month-dropdown {
     position: absolute;
-    width: 260px;
-    background: #FFFFFF;
-    border: 1px solid #E5E7EB;
+    width: 252px;
+    background: #ffffff;
+    border: 1px solid #f0f0f0;
     border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04);
     padding: 16px;
     z-index: 2000;
     opacity: 0;
     visibility: hidden;
-    transform: scaleY(0.95);
-    transform-origin: top;
-    transition: opacity 150ms ease-out, transform 150ms ease-out, visibility 150ms;
+    transform: translateY(-6px);
+    transition: opacity 150ms ease, transform 150ms ease, visibility 150ms;
 }
 
 .custom-month-dropdown.show {
     opacity: 1;
     visibility: visible;
-    transform: scaleY(1);
+    transform: translateY(0);
 }
 
 .custom-month-dropdown.pos-top {
     bottom: calc(100% + 8px);
-    transform-origin: bottom;
+    transform: translateY(6px);
+}
+
+.custom-month-dropdown.pos-top.show {
+    transform: translateY(0);
 }
 
 .custom-month-dropdown.pos-bottom {
     top: calc(100% + 8px);
-    transform-origin: top;
 }
 
 .cmd-header {
@@ -1458,69 +1468,117 @@ tr:hover .action-group {
     justify-content: space-between;
     align-items: center;
     padding-bottom: 12px;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid #f5f7f9;
     margin-bottom: 12px;
 }
 
 .cmd-year {
     font-weight: 700;
-    font-size: 15px;
+    font-size: 0.9rem;
     color: #111827;
+    letter-spacing: -0.01em;
 }
 
 .cmd-btn-nav {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
     border: none;
     background: transparent;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #6B7280;
+    color: #9CA3AF;
     font-size: 10px;
-    transition: background 0.2s;
+    transition: background 120ms ease, color 120ms ease;
 }
 
 .cmd-btn-nav:hover {
-    background: #F3F4F6;
+    background: #f3f4f6;
+    color: #374151;
 }
 
 .cmd-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-    gap: 6px;
+    gap: 4px;
     margin-bottom: 12px;
 }
 
 .cmd-month-cell {
     border-radius: 8px;
-    padding: 8px 0;
+    padding: 7px 0;
     text-align: center;
-    font-size: 13px;
+    font-size: 0.78rem;
     font-weight: 500;
     color: #374151;
     cursor: pointer;
     border: 1px solid transparent;
-    transition: all 0.2s;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
 .cmd-month-cell:hover {
-    background: #F3F4F6;
+    background: #f8fafc;
+    color: #111827;
 }
 
 .cmd-month-cell.current-month {
-    border-color: #2563EB;
-    color: #2563EB;
+    border-color: #3b82f6;
+    color: #3b82f6;
+    font-weight: 600;
 }
 
 .cmd-month-cell.active-month {
-    background: #2563EB;
-    color: #FFFFFF;
+    background: #3b82f6;
+    color: #ffffff;
     font-weight: 600;
-    border-color: #2563EB;
+    border-color: #3b82f6;
+}
+
+.cmd-month-cell.active-month:hover {
+    background: #2563eb;
+}
+
+.cmd-footer {
+    border-top: 1px solid #f5f7f9;
+    padding-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cmd-btn-clear {
+    background: transparent;
+    border: none;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #9CA3AF;
+    cursor: pointer;
+    padding: 4px 0;
+    font-family: inherit;
+    transition: color 120ms ease;
+}
+
+.cmd-btn-clear:hover {
+    color: #ef4444;
+}
+
+.cmd-btn-today {
+    background: transparent;
+    border: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #3b82f6;
+    cursor: pointer;
+    padding: 4px 0;
+    font-family: inherit;
+    transition: color 120ms ease;
+}
+
+.cmd-btn-today:hover {
+    color: #2563eb;
+}
 }
 
 .cmd-footer {
