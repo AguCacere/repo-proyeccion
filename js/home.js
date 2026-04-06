@@ -1,5 +1,4 @@
 // ── Config ──────────────────────────────────────────────────────────────────
-const ANTHROPIC_API_KEY = 'YOUR_ANTHROPIC_API_KEY_HERE';
 const AI_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours in ms
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -381,35 +380,24 @@ async function renderAIInsight(rows, kpis, from, to) {
         `- Tipo: ${r.tipo || 'N/A'} | Motivo: ${r.motivoDemora || 'N/A'} | Demora: ${minutesToHhMm(r.demoraMinutes)}`
     ).join('\n');
 
-    const userMessage = `KPIs del período (${periodLabel}):
+    const kpisTexto = `KPIs del período (${periodLabel}):
 - Total registros: ${kpis.total}
 - Registros con demora: ${kpis.withDelayCount} (${kpis.pctDelay}% del total)
 - Tiempo acumulado de demoras: ${minutesToHhMm(kpis.acumMinutes)}
-- Promedio de demora (solo con demora): ${minutesToHhMm(kpis.avgMinutes)}
+- Promedio de demora (solo con demora): ${minutesToHhMm(kpis.avgMinutes)}`;
 
-Detalle de registros con demora:
-${detailList || 'Sin registros con demora.'}`;
+    const demorasTexto = detailList || 'Sin registros con demora.';
 
     try {
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        const resp = await fetch('/api/insight', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': ANTHROPIC_API_KEY,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true',
-            },
-            body: JSON.stringify({
-                model: 'claude-haiku-4-5-20251001',
-                max_tokens: 300,
-                system: 'Sos un analista de operaciones bancarias. Recibís KPIs y el detalle de demoras del período seleccionado. Generá un análisis corto (3-4 oraciones) identificando patrones, procesos más afectados y una recomendación concreta. Respondé en español, tono profesional y directo. No uses listas, solo prosa fluida.',
-                messages: [{ role: 'user', content: userMessage }],
-            }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kpis: kpisTexto, demoras: demorasTexto }),
         });
 
         if (!resp.ok) throw new Error(`API error ${resp.status}`);
-        const json = await resp.json();
-        const text = json.content?.[0]?.text || 'Sin respuesta.';
+        const data = await resp.json();
+        const text = data.insight || 'Sin respuesta.';
 
         localStorage.setItem(cacheKey, JSON.stringify({ text, ts: Date.now() }));
         aiBody.textContent = text;
