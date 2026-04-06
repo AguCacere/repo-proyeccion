@@ -2,8 +2,10 @@
 const AI_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours in ms
 
 // ── State ────────────────────────────────────────────────────────────────────
-let activeFrom = ''; // YYYY-MM-DD
-let activeTo   = ''; // YYYY-MM-DD
+let activeFrom  = ''; // YYYY-MM-DD
+let activeTo    = ''; // YYYY-MM-DD
+let _pickerFrom = null;
+let _pickerTo   = null;
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 function toYMD(date) {
@@ -124,6 +126,150 @@ function normalizeFecha(raw) {
         }
     }
     return raw; // already YYYY-MM-DD
+}
+
+// ── Custom Day Picker ─────────────────────────────────────────────────────────
+function _createDayPicker({ wrapperId, hiddenInputId, displayId, triggerId }) {
+    const wrapper   = document.getElementById(wrapperId);
+    const triggerEl = document.getElementById(triggerId);
+    const displayEl = document.getElementById(displayId);
+    const hiddenEl  = document.getElementById(hiddenInputId);
+
+    let viewYear     = new Date().getFullYear();
+    let viewMonth    = new Date().getMonth() + 1;
+    let selectedDate = null; // 'YYYY-MM-DD' or null
+
+    // Inject dropdown
+    const dropdown = document.createElement('div');
+    dropdown.className = 'cdp-dropdown';
+    dropdown.innerHTML = `
+        <div class="cdp-header">
+            <button class="cdp-nav-btn cdp-prev">&#9664;</button>
+            <span class="cdp-month-label"></span>
+            <button class="cdp-nav-btn cdp-next">&#9654;</button>
+        </div>
+        <div class="cdp-weekdays">
+            <span class="cdp-weekday">LU</span><span class="cdp-weekday">MA</span>
+            <span class="cdp-weekday">MI</span><span class="cdp-weekday">JU</span>
+            <span class="cdp-weekday">VI</span><span class="cdp-weekday">SA</span>
+            <span class="cdp-weekday">DO</span>
+        </div>
+        <div class="cdp-days"></div>
+        <div class="cdp-footer">
+            <button class="cdp-btn-clear">Borrar</button>
+            <button class="cdp-btn-today">Hoy</button>
+        </div>`;
+    wrapper.appendChild(dropdown);
+
+    const monthLabel = dropdown.querySelector('.cdp-month-label');
+    const daysGrid   = dropdown.querySelector('.cdp-days');
+
+    function renderCalendar() {
+        const mn = MONTH_NAMES_FULL_ES[viewMonth - 1];
+        monthLabel.textContent = mn.charAt(0).toUpperCase() + mn.slice(1) + ' ' + viewYear;
+
+        // ISO week offset: Monday = col 0
+        const firstDayJS  = new Date(viewYear, viewMonth - 1, 1).getDay(); // 0=Sun
+        const startOffset = (firstDayJS + 6) % 7;
+        const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+        const today       = toYMD(new Date());
+
+        let html = '';
+        for (let i = 0; i < startOffset; i++) {
+            html += `<button class="cdp-day" disabled></button>`;
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+            const ds  = `${viewYear}-${String(viewMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const cls = ['cdp-day', ds === today ? 'today' : '', ds === selectedDate ? 'selected' : ''].filter(Boolean).join(' ');
+            html += `<button class="${cls}" data-date="${ds}">${d}</button>`;
+        }
+        daysGrid.innerHTML = html;
+
+        daysGrid.querySelectorAll('[data-date]').forEach(btn => {
+            btn.addEventListener('click', () => { _select(btn.dataset.date); _close(); });
+        });
+    }
+
+    function _select(ds) {
+        selectedDate   = ds;
+        hiddenEl.value = ds;
+        const [y, m, d] = ds.split('-');
+        displayEl.textContent = `${d}/${m}/${y}`;
+        renderCalendar();
+    }
+
+    function _clear() {
+        selectedDate          = null;
+        hiddenEl.value        = '';
+        displayEl.textContent = 'dd/mm/aaaa';
+        renderCalendar();
+    }
+
+    function _open() {
+        document.querySelectorAll('.cdp-dropdown.open').forEach(el => {
+            if (el !== dropdown) {
+                el.classList.remove('open');
+                el.closest('.custom-day-picker')?.querySelector('.cdp-trigger')?.classList.remove('open');
+            }
+        });
+        dropdown.classList.add('open');
+        triggerEl.classList.add('open');
+    }
+
+    function _close() {
+        dropdown.classList.remove('open');
+        triggerEl.classList.remove('open');
+    }
+
+    triggerEl.addEventListener('click', e => {
+        e.stopPropagation();
+        dropdown.classList.contains('open') ? _close() : _open();
+    });
+
+    dropdown.querySelector('.cdp-prev').addEventListener('click', e => {
+        e.stopPropagation();
+        if (--viewMonth < 1) { viewMonth = 12; viewYear--; }
+        renderCalendar();
+    });
+
+    dropdown.querySelector('.cdp-next').addEventListener('click', e => {
+        e.stopPropagation();
+        if (++viewMonth > 12) { viewMonth = 1; viewYear++; }
+        renderCalendar();
+    });
+
+    dropdown.querySelector('.cdp-btn-clear').addEventListener('click', e => {
+        e.stopPropagation();
+        _clear();
+        _close();
+    });
+
+    dropdown.querySelector('.cdp-btn-today').addEventListener('click', e => {
+        e.stopPropagation();
+        const t = toYMD(new Date());
+        viewYear  = +t.split('-')[0];
+        viewMonth = +t.split('-')[1];
+        _select(t);
+        _close();
+    });
+
+    document.addEventListener('click', e => {
+        if (!wrapper.contains(e.target)) _close();
+    });
+
+    renderCalendar();
+
+    return {
+        setValue(ds) {
+            if (ds) {
+                viewYear  = +ds.split('-')[0];
+                viewMonth = +ds.split('-')[1];
+                _select(ds);
+            } else {
+                _clear();
+            }
+        }
+    };
 }
 
 // Fetches ALL records then filters client-side on normalized dates.
@@ -658,9 +804,9 @@ async function applyFilter() {
     // Update subtitle
     document.getElementById('pageSubtitle').textContent = buildSubtitle(from, to);
 
-    // Update date inputs
-    document.getElementById('inputFrom').value = from;
-    document.getElementById('inputTo').value   = to;
+    // Update date pickers
+    if (_pickerFrom) _pickerFrom.setValue(from);
+    if (_pickerTo)   _pickerTo.setValue(to);
 
     // Highlight active pill
     const active = detectShortcut(from, to);
@@ -695,8 +841,9 @@ function initFilter() {
     activeFrom = firstDayOfMonth(year, month);
     activeTo   = lastDayOfMonth(year, month);
 
-    document.getElementById('inputFrom').value = activeFrom;
-    document.getElementById('inputTo').value   = activeTo;
+    // Initialize custom day pickers
+    _pickerFrom = _createDayPicker({ wrapperId: 'pickerFrom', hiddenInputId: 'inputFrom', displayId: 'displayFrom', triggerId: 'triggerFrom' });
+    _pickerTo   = _createDayPicker({ wrapperId: 'pickerTo',   hiddenInputId: 'inputTo',   displayId: 'displayTo',   triggerId: 'triggerTo'   });
 
     // Shortcut pills
     document.querySelectorAll('.shortcut-pill').forEach(btn => {
