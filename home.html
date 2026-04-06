@@ -145,34 +145,54 @@
         .top-table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
 
         .top-table th {
-            font-size: 0.72rem;
+            font-size: 0.7rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
             color: #9CA3AF;
-            text-align: left;
-            padding: 0 8px 12px;
+            padding: 0 16px 12px;
             border-bottom: 1px solid #f0f0f0;
         }
+
+        .top-table th.col-motivo { width: 70%; text-align: left; }
+        .top-table th.col-tiempo { width: 30%; text-align: right; }
+
+        .top-table tbody tr {
+            transition: background 120ms ease;
+        }
+
+        .top-table tbody tr:hover td { background: #f8fafc; }
 
         .top-table td {
             font-size: 0.84rem;
             color: #374151;
-            padding: 10px 8px;
-            border-bottom: 1px solid #f9fafb;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f5f7f9;
+            vertical-align: middle;
         }
 
         .top-table tr:last-child td { border-bottom: none; }
 
-        .top-table tbody tr:hover td { background: #f9fafb; }
-
+        /* Accent bar row — left border acting as rank indicator */
         .top-table td.motivo-cell {
-            font-weight: 500;
-            color: #111827;
-            max-width: 160px;
+            position: relative;
+            padding-left: 20px;
+        }
+
+        .top-table td.motivo-cell::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            border-radius: 2px;
+            background: var(--accent-bar-color, #cbd5e1);
+            height: var(--accent-bar-h, 16px);
         }
 
         .motivo-text {
@@ -180,30 +200,20 @@
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
+            line-height: 1.45;
+            font-weight: 500;
+            color: #1e293b;
+            cursor: default;
         }
 
-        .top-table td.num-cell {
-            font-variant-numeric: tabular-nums;
-            font-weight: 600;
-        }
-
-        .rank-badge {
-            display: inline-flex;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: #f3f4f6;
-            color: #6B7280;
-            font-size: 0.68rem;
+        .top-table td.tiempo-cell {
+            text-align: right;
             font-weight: 700;
-            align-items: center;
-            justify-content: center;
-            margin-right: 6px;
+            font-variant-numeric: tabular-nums;
+            color: #3b82f6;
+            font-size: 0.875rem;
+            white-space: nowrap;
         }
-
-        .rank-badge.top1 { background: #fef3c7; color: #d97706; }
-        .rank-badge.top2 { background: #f0fdf4; color: #16a34a; }
-        .rank-badge.top3 { background: #eff6ff; color: #2563eb; }
 
         /* ── Empty state ── */
         .empty-state {

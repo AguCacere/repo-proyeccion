@@ -313,31 +313,40 @@ function renderTopMotivos(rows) {
         return;
     }
 
+    // Aggregate by motivoDemora
     const map = {};
     withDelay.forEach(r => {
         const key = r.motivoDemora.trim();
-        if (!map[key]) map[key] = { motivo: key, totalMin: 0, count: 0 };
+        if (!map[key]) map[key] = { motivo: key, totalMin: 0 };
         map[key].totalMin += r.demoraMinutes;
-        map[key].count    += 1;
     });
 
     const sorted = Object.values(map).sort((a, b) => b.totalMin - a.totalMin).slice(0, 5);
-    const rankClasses = ['top1','top2','top3','',''];
+    const maxMin = sorted[0]?.totalMin || 1;
 
-    const rowsHtml = sorted.map((item, i) => `
+    // Accent bar: proportional height (12px–28px) and opacity-based color
+    const rowsHtml = sorted.map((item) => {
+        const ratio   = item.totalMin / maxMin;           // 0..1
+        const barH    = Math.round(12 + ratio * 16);      // 12px..28px
+        const opacity = (0.35 + ratio * 0.65).toFixed(2); // 0.35..1.00
+        return `
         <tr>
-            <td class="motivo-cell">
-                <span class="rank-badge ${rankClasses[i]}">${i + 1}</span>
+            <td class="motivo-cell"
+                style="--accent-bar-color: rgba(59,130,246,${opacity}); --accent-bar-h: ${barH}px">
                 <span class="motivo-text" title="${_esc(item.motivo)}">${_esc(item.motivo)}</span>
             </td>
-            <td class="num-cell">${minutesToHhMm(item.totalMin)}</td>
-            <td class="num-cell">${item.count}</td>
-        </tr>
-    `).join('');
+            <td class="tiempo-cell">${minutesToHhMm(item.totalMin)}</td>
+        </tr>`;
+    }).join('');
 
     container.innerHTML = `
         <table class="top-table">
-            <thead><tr><th>Motivo</th><th>Tiempo total</th><th>Ocurrencias</th></tr></thead>
+            <thead>
+                <tr>
+                    <th class="col-motivo">Motivo</th>
+                    <th class="col-tiempo">Tiempo total</th>
+                </tr>
+            </thead>
             <tbody>${rowsHtml}</tbody>
         </table>
     `;
