@@ -48,13 +48,20 @@
                 </li>
             </ul>
         </nav>
+        <div class="nav-footer">
+            <span class="nav-footer-version">v1.0</span>
+            <div class="nav-footer-status">
+                <span class="nav-footer-dot"></span>
+                <span>Online</span>
+            </div>
+        </div>
     </aside>
 
     <main class="main-content">
         <!-- Dashboard Header (2 capas) -->
         <div class="dashboard-topbar">
     <div class="title-section">
-        <h1>Proyeccion Mensual</h1>
+        <h1>Proyección Mensual</h1>
         <div class="topbar-filters">
             <select id="filterType" class="filter-select">
                 <option value="all">Todos los Tipos</option>
@@ -85,10 +92,22 @@
         </div>
     </div>
     <div class="header-btns">
-        <button class="btn btn-pdf" onclick="generatePDFReport()">📄 Generar PDF</button>
-        <button class="btn btn-export" onclick="exportData()">📗 Exportar XLSX</button>
-        <button class="btn btn-import" onclick="document.getElementById('importFile').click()">📗 Importar XLSX</button>
-        <button class="btn btn-add" onclick="openAddModal()">➕ Registro</button>
+        <button class="btn btn-pdf" onclick="generatePDFReport()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            PDF
+        </button>
+        <button class="btn btn-export" onclick="exportData()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar
+        </button>
+        <button class="btn btn-import" onclick="document.getElementById('importFile').click()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Importar
+        </button>
+        <button class="btn btn-add" onclick="openAddModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nuevo
+        </button>
         <input type="file" id="importFile" style="display: none;" accept=".xlsx, .xls" onchange="importData(event)">
     </div>
 </div>
@@ -258,7 +277,9 @@
     <div id="deleteConfirmModal" class="modal-overlay">
         <div class="modal delete-modal">
             <div class="modal-body">
-                <div class="delete-icon">⚠️</div>
+                <div class="delete-icon">
+                    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
                 <h2>¿Eliminar registro?</h2>
                 <p>Estás a punto de eliminar permanentemente el registro del <strong id="deleteRecordDate">---</strong>.
                 </p>
