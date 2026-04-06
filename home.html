@@ -288,6 +288,103 @@
             50% { opacity: 0.45; }
         }
 
+        /* ── Filter bar ── */
+        .filter-bar {
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid #f0f0f0;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .shortcuts-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .shortcut-pill {
+            background: #f1f5f9;
+            color: #64748b;
+            border: none;
+            border-radius: 20px;
+            padding: 5px 13px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 150ms ease, color 150ms ease;
+            white-space: nowrap;
+            font-family: inherit;
+        }
+
+        .shortcut-pill:hover { background: #e2e8f0; }
+
+        .shortcut-pill.active {
+            background: #3b82f6;
+            color: #ffffff;
+        }
+
+        .filter-inputs-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .date-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .date-field label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #9CA3AF;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .date-field input[type="date"] {
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 0.84rem;
+            color: #374151;
+            background: #ffffff;
+            font-family: inherit;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 150ms ease;
+        }
+
+        .date-field input[type="date"]:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+        }
+
+        .btn-apply {
+            background: #3b82f6;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 18px;
+            font-size: 0.84rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 150ms ease;
+            font-family: inherit;
+            white-space: nowrap;
+            align-self: flex-end;
+        }
+
+        .btn-apply:hover { background: #2563eb; }
+        .btn-apply:active { background: #1d4ed8; }
+
         /* ── Responsive ── */
         @media (max-width: 900px) {
             .kpi-grid { grid-template-columns: repeat(2, 1fr); }
@@ -297,6 +394,8 @@
         @media (max-width: 600px) {
             .kpi-grid { grid-template-columns: 1fr; }
             .home-content { padding: 24px 16px 40px; }
+            .filter-inputs-row { flex-direction: column; align-items: stretch; }
+            .btn-apply { width: 100%; }
         }
     </style>
 </head>
@@ -343,6 +442,27 @@
             <div class="home-header">
                 <h1 id="pageTitle">Inicio</h1>
                 <p id="pageSubtitle">Cargando datos del mes actual…</p>
+            </div>
+
+            <!-- Filter bar -->
+            <div class="filter-bar">
+                <div class="shortcuts-row">
+                    <button class="shortcut-pill" data-shortcut="this-month">Este mes</button>
+                    <button class="shortcut-pill" data-shortcut="last-month">Mes anterior</button>
+                    <button class="shortcut-pill" data-shortcut="last-3-months">Últimos 3 meses</button>
+                    <button class="shortcut-pill" data-shortcut="this-year">Este año</button>
+                </div>
+                <div class="filter-inputs-row">
+                    <div class="date-field">
+                        <label for="inputFrom">Desde</label>
+                        <input type="date" id="inputFrom">
+                    </div>
+                    <div class="date-field">
+                        <label for="inputTo">Hasta</label>
+                        <input type="date" id="inputTo">
+                    </div>
+                    <button class="btn-apply" id="btnApply">Aplicar</button>
+                </div>
             </div>
 
             <!-- Sección 1: KPI Cards -->
