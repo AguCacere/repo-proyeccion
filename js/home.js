@@ -387,6 +387,9 @@ function _setBadgeClass(id, cls) {
 function renderKPIs(kpis, prevKpis, prevLabel) {
     const DURATION = 1200;
 
+    // Clear skeleton state
+    document.querySelectorAll('.kpi-value').forEach(el => el.classList.remove('skeleton'));
+
     // Animate each KPI value
     animateValue(
         document.getElementById('kpiTotal'),
@@ -414,6 +417,7 @@ function renderKPIs(kpis, prevKpis, prevLabel) {
 
     // Badges (set immediately — no animation needed)
     document.getElementById('kpiPctBadge').textContent = `${kpis.withDelayCount} registros`;
+    document.getElementById('kpiTotalBadge').textContent = `${kpis.total} registros`;
     if (prevKpis) {
         _setBadgeClass('kpiPctBadge', kpis.pctDelay > prevKpis.pctDelay ? 'down' : 'up');
     }
@@ -818,6 +822,16 @@ async function applyFilter() {
         btn.classList.toggle('active', btn.dataset.shortcut === active);
     });
 
+    // Update dynamic labels
+    const periodLabel = buildSubtitle(from, to);
+    const el = document.getElementById('topMotivosPeriod');
+    if (el) el.textContent = periodLabel;
+
+    // KPI skeleton + button loading state
+    const btnApply = document.getElementById('btnApply');
+    if (btnApply) { btnApply.disabled = true; btnApply.classList.add('loading'); }
+    document.querySelectorAll('.kpi-value').forEach(v => { v.classList.add('skeleton'); v.textContent = ''; });
+
     // Fetch current range + previous period in parallel
     try {
         const prev = prevPeriodRange(from, to);
@@ -836,12 +850,13 @@ async function applyFilter() {
         await renderAIInsight(currentRows, kpis, from, to);
     } catch (err) {
         console.error('[applyFilter] Error cargando datos:', err);
-        // Show visible error so it doesn't silently stay in loading state
         document.getElementById('topMotivosContainer').innerHTML =
             `<div class="empty-state"><span class="es-icon">⚠️</span>Error al cargar datos.<br><small style="color:#9CA3AF">${err.message}</small></div>`;
-        document.querySelectorAll('.kpi-value').forEach(el => { el.textContent = 'Error'; });
+        document.querySelectorAll('.kpi-value').forEach(el => { el.classList.remove('skeleton'); el.textContent = '—'; });
         document.getElementById('aiCacheNote').textContent = `Error: ${err.message}`;
         document.getElementById('aiBody').textContent = 'No se pudieron cargar los datos.';
+    } finally {
+        if (btnApply) { btnApply.disabled = false; btnApply.classList.remove('loading'); }
     }
 }
 
@@ -881,6 +896,16 @@ function initFilter() {
         activeFrom = from;
         activeTo   = to;
         applyFilter();
+    });
+
+    // AI regenerate button
+    document.getElementById('btnRegenAI')?.addEventListener('click', () => {
+        const btn = document.getElementById('btnRegenAI');
+        btn.classList.add('spinning');
+        localStorage.removeItem(`sqr_ai_insight_v2_${activeFrom}_${activeTo}`);
+        fetchRangeData(activeFrom, activeTo)
+            .then(rows => renderAIInsight(rows, calcKPIs(rows), activeFrom, activeTo))
+            .finally(() => btn.classList.remove('spinning'));
     });
 
 }
