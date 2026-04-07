@@ -1001,8 +1001,9 @@ function openComparativoModal() {
     // Populate Día dropdown
     const diaSel = document.getElementById('compDia');
     if (diaSel) {
+        const weekdays = DAYS_ES.filter(d => d !== 'Sábado' && d !== 'Domingo');
         diaSel.innerHTML = '<option value="">Todos los días</option>' +
-            DAYS_ES.map(d => `<option value="${_esc(d)}">${_esc(d)}</option>`).join('');
+            weekdays.map(d => `<option value="${_esc(d)}">${_esc(d)}</option>`).join('');
     }
 
     // Clear previous results
