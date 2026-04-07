@@ -1062,6 +1062,7 @@ function renderComparativoColumn(rows, title, periodLabel) {
         return `
         <div class="comp-row ${hasDelay ? 'has-delay' : ''}">
             <div class="comp-row-date">${_esc(dateFormatted)}</div>
+            <div class="comp-row-dia">${_esc(r.diaSemana || '—')}</div>
             <div class="comp-row-tipo">${_esc(r.tipo || '—')}</div>
             <div class="comp-row-demora ${hasDelay ? 'bad' : 'ok'}">${hasDelay ? _esc(r.demoras) : 'Sin demora'}</div>
         </div>`;
