@@ -1,6 +1,135 @@
 // Configuración Global
 const TOLERANCIA_MINUTOS = 3;
 
+// ── Custom Day Picker ─────────────────────────────────────────────────────────
+const _CDP_MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function _cdpToYMD(date) { return date.toISOString().slice(0, 10); }
+
+function _createDayPicker({ wrapperId, hiddenInputId, displayId, triggerId }) {
+    const wrapper   = document.getElementById(wrapperId);
+    const triggerEl = document.getElementById(triggerId);
+    const displayEl = document.getElementById(displayId);
+    const hiddenEl  = document.getElementById(hiddenInputId);
+
+    let viewYear     = new Date().getFullYear();
+    let viewMonth    = new Date().getMonth() + 1;
+    let selectedDate = null;
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'cdp-dropdown';
+    dropdown.innerHTML = `
+        <div class="cdp-header">
+            <button class="cdp-nav-btn cdp-prev">&#9664;</button>
+            <span class="cdp-month-label"></span>
+            <button class="cdp-nav-btn cdp-next">&#9654;</button>
+        </div>
+        <div class="cdp-weekdays">
+            <span class="cdp-weekday">LU</span><span class="cdp-weekday">MA</span>
+            <span class="cdp-weekday">MI</span><span class="cdp-weekday">JU</span>
+            <span class="cdp-weekday">VI</span><span class="cdp-weekday">SA</span>
+            <span class="cdp-weekday">DO</span>
+        </div>
+        <div class="cdp-days"></div>
+        <div class="cdp-footer">
+            <button class="cdp-btn-clear">Borrar</button>
+            <button class="cdp-btn-today">Hoy</button>
+        </div>`;
+    wrapper.appendChild(dropdown);
+
+    const monthLabel = dropdown.querySelector('.cdp-month-label');
+    const daysGrid   = dropdown.querySelector('.cdp-days');
+
+    function _renderCalendar() {
+        monthLabel.textContent = _CDP_MONTHS[viewMonth - 1] + ' ' + viewYear;
+        const firstDayJS  = new Date(viewYear, viewMonth - 1, 1).getDay();
+        const startOffset = (firstDayJS + 6) % 7; // Mon=0
+        const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+        const today       = _cdpToYMD(new Date());
+        let html = '';
+        for (let i = 0; i < startOffset; i++) html += `<button class="cdp-day" disabled></button>`;
+        for (let d = 1; d <= daysInMonth; d++) {
+            const ds  = `${viewYear}-${String(viewMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const cls = ['cdp-day', ds === today ? 'today' : '', ds === selectedDate ? 'selected' : ''].filter(Boolean).join(' ');
+            html += `<button class="${cls}" data-date="${ds}">${d}</button>`;
+        }
+        daysGrid.innerHTML = html;
+        daysGrid.querySelectorAll('[data-date]').forEach(btn => {
+            btn.addEventListener('click', () => { _select(btn.dataset.date); _close(); });
+        });
+    }
+
+    function _select(ds) {
+        selectedDate   = ds;
+        hiddenEl.value = ds;
+        const [y, m, d] = ds.split('-');
+        displayEl.textContent = `${d}/${m}/${y}`;
+        _renderCalendar();
+    }
+
+    function _clear() {
+        selectedDate          = null;
+        hiddenEl.value        = '';
+        displayEl.textContent = 'dd/mm/aaaa';
+        _renderCalendar();
+    }
+
+    function _open() {
+        document.querySelectorAll('.cdp-dropdown.open').forEach(el => {
+            if (el !== dropdown) {
+                el.classList.remove('open');
+                el.closest('.custom-day-picker')?.querySelector('.cdp-trigger')?.classList.remove('open');
+            }
+        });
+        dropdown.classList.add('open');
+        triggerEl.classList.add('open');
+    }
+
+    function _close() {
+        dropdown.classList.remove('open');
+        triggerEl.classList.remove('open');
+    }
+
+    triggerEl.addEventListener('click', e => { e.stopPropagation(); dropdown.classList.contains('open') ? _close() : _open(); });
+    dropdown.querySelector('.cdp-prev').addEventListener('click', e => { e.stopPropagation(); if (--viewMonth < 1) { viewMonth = 12; viewYear--; } _renderCalendar(); });
+    dropdown.querySelector('.cdp-next').addEventListener('click', e => { e.stopPropagation(); if (++viewMonth > 12) { viewMonth = 1; viewYear++; } _renderCalendar(); });
+    dropdown.querySelector('.cdp-btn-clear').addEventListener('click', e => { e.stopPropagation(); _clear(); _close(); });
+    dropdown.querySelector('.cdp-btn-today').addEventListener('click', e => {
+        e.stopPropagation();
+        const t = _cdpToYMD(new Date());
+        viewYear = +t.split('-')[0]; viewMonth = +t.split('-')[1];
+        _select(t); _close();
+    });
+    document.addEventListener('click', e => { if (!wrapper.contains(e.target)) _close(); });
+    _renderCalendar();
+
+    return {
+        setValue(ds) {
+            if (ds) {
+                viewYear  = +ds.split('-')[0];
+                viewMonth = +ds.split('-')[1];
+                _select(ds);
+            } else {
+                _clear();
+            }
+        },
+        close: _close,
+    };
+}
+
+// Picker instance for the add/edit modal
+let _modalDatePicker = null;
+
+function _initModalDatePicker() {
+    if (_modalDatePicker) return; // already initialised
+    _modalDatePicker = _createDayPicker({
+        wrapperId:     'modalDatePicker',
+        hiddenInputId: 'addFecha',
+        displayId:     'modalDateDisplay',
+        triggerId:     'modalDateTrigger',
+    });
+}
+
 // ── Animación count-up (compartida por todas las páginas) ─────────────────────
 function animateValue(element, start, end, duration, formatter) {
     const startTime = performance.now();
@@ -1518,8 +1647,8 @@ function openAddModal() {
     document.getElementById('modalTitle').innerText = 'Añadir Nuevo Registro';
     document.getElementById('btnSaveRecord').innerText = 'Añadir';
 
-    // Limpiar campos
-    document.getElementById('addFecha').valueAsDate = new Date();
+    _initModalDatePicker();
+    _modalDatePicker.setValue(_cdpToYMD(new Date()));
     document.getElementById('addTipo').value = 'Normal';
     document.getElementById('addHoraMin').value = '';
     document.getElementById('addHoraMax').value = '';
@@ -1539,7 +1668,8 @@ function editRecord(id) {
     document.getElementById('modalTitle').innerText = 'Editar Registro';
     document.getElementById('btnSaveRecord').innerText = 'Actualizar';
 
-    document.getElementById('addFecha').value = item.fecha;
+    _initModalDatePicker();
+    _modalDatePicker.setValue(item.fecha);
     document.getElementById('addTipo').value = item.tipo;
     document.getElementById('addHoraMin').value = item.horaMin.substring(0, 5);
     document.getElementById('addHoraMax').value = item.horaMax.substring(0, 5);
