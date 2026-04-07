@@ -607,63 +607,128 @@ async function loadAndRenderTrendChart() {
         months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
     }
 
-    // Single query spanning the full 6-month window
     const rangeFrom = firstDayOfMonth(months[0].year, months[0].month);
     const rangeTo   = lastDayOfMonth(months[months.length - 1].year, months[months.length - 1].month);
     const allRows   = await fetchRangeData(rangeFrom, rangeTo);
 
-    console.log(`[Tendencia] Registros traídos (${rangeFrom} → ${rangeTo}): ${allRows.length}`, allRows);
-
-    // Group client-side by YYYY-MM using Fecha.substring(0, 7)
-    // Exclude records where Demoras is '00:00:00', null or '' (demoraMinutes === 0)
     const byMonth = {};
     months.forEach(m => {
         byMonth[`${m.year}-${String(m.month).padStart(2, '0')}`] = 0;
     });
-
     allRows.forEach(r => {
-        const key = (r.fecha || '').substring(0, 7); // e.g. "2026-02"
-        if (key in byMonth && r.demoraMinutes > 0) {
-            byMonth[key] += r.demoraMinutes;
-        }
+        const key = (r.fecha || '').substring(0, 7);
+        if (key in byMonth && r.demoraMinutes > 0) byMonth[key] += r.demoraMinutes;
     });
-
-    console.log('[Tendencia] Minutos acumulados por mes:', byMonth);
 
     const labels = months.map(m => MONTH_NAMES_ES[m.month - 1]);
     const values = months.map(m => byMonth[`${m.year}-${String(m.month).padStart(2, '0')}`] || 0);
 
+    // Derived stats for visual decoration
+    const nonZero  = values.filter(v => v > 0);
+    const avg      = nonZero.length > 0 ? nonZero.reduce((s, v) => s + v, 0) / nonZero.length : 0;
+    const maxVal   = Math.max(...values);
+    const minNonZ  = nonZero.length > 0 ? Math.min(...nonZero) : 0;
+
+    // Per-point colors: red if above avg, green if below, blue otherwise
+    const pointColors = values.map(v => {
+        if (v === 0) return '#d1d5db';
+        if (v === maxVal) return '#ef4444';
+        if (v <= minNonZ && minNonZ < avg) return '#10b981';
+        if (v > avg) return '#f97316';
+        return '#3b82f6';
+    });
+
+    // Per-point radius: larger for peak and minimum
+    const pointRadii = values.map(v => {
+        if (v === maxVal || (v === minNonZ && minNonZ > 0)) return 7;
+        if (v === 0) return 3;
+        return 4.5;
+    });
+
     const ctx = document.getElementById('trendChart').getContext('2d');
     if (trendChartInstance) trendChartInstance.destroy();
+
+    // Gradient fill
+    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+    gradient.addColorStop(0, 'rgba(59,130,246,0.18)');
+    gradient.addColorStop(1, 'rgba(59,130,246,0)');
+
+    // Average line dataset (flat)
+    const avgDataset = avg > 0 ? [{
+        label: 'Promedio',
+        data: values.map(() => avg),
+        borderColor: 'rgba(156,163,175,0.6)',
+        borderWidth: 1.5,
+        borderDash: [5, 4],
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: false,
+        tension: 0,
+        order: 1,
+    }] : [];
 
     trendChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels,
-            datasets: [{
-                label: 'Minutos de demora',
-                data: values,
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59,130,246,0.06)',
-                borderWidth: 2,
-                pointBackgroundColor: '#3b82f6',
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                tension: 0.4,
-                fill: true,
-            }]
+            datasets: [
+                {
+                    label: 'Demora acumulada',
+                    data: values,
+                    borderColor: '#3b82f6',
+                    backgroundColor: gradient,
+                    borderWidth: 2.5,
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: pointRadii,
+                    pointHoverRadius: pointRadii.map(r => r + 2),
+                    tension: 0.4,
+                    fill: true,
+                    order: 0,
+                },
+                ...avgDataset,
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
                 tooltip: {
                     backgroundColor: '#1f2937',
                     titleColor: '#f9fafb',
                     bodyColor: '#d1d5db',
-                    padding: 10,
-                    callbacks: { label: ctx => ` ${minutesToHhMm(ctx.parsed.y)}` }
+                    padding: 12,
+                    cornerRadius: 8,
+                    boxPadding: 4,
+                    callbacks: {
+                        title: ctx => ctx[0].label,
+                        label: ctx => {
+                            if (ctx.datasetIndex === 1) return `  Promedio: ${minutesToHhMm(ctx.parsed.y)}`;
+                            const v    = ctx.parsed.y;
+                            const prev = values[ctx.dataIndex - 1];
+                            let delta  = '';
+                            if (ctx.dataIndex > 0 && prev !== undefined) {
+                                const diff = v - prev;
+                                delta = diff > 0
+                                    ? `  ▲ +${minutesToHhMm(diff)} vs ${labels[ctx.dataIndex - 1]}`
+                                    : diff < 0
+                                        ? `  ▼ ${minutesToHhMm(Math.abs(diff))} vs ${labels[ctx.dataIndex - 1]}`
+                                        : '';
+                            }
+                            const base = `  ${minutesToHhMm(v)}`;
+                            return delta ? [base, delta] : base;
+                        },
+                        afterBody: ctx => {
+                            const v = ctx[0]?.parsed.y;
+                            if (!avg || ctx[0]?.datasetIndex === 1) return [];
+                            if (v === maxVal) return ['  ↑ Pico máximo del período'];
+                            if (v === minNonZ && minNonZ < avg) return ['  ↓ Mínimo del período'];
+                            return [];
+                        },
+                    }
                 }
             },
             scales: {
@@ -673,11 +738,12 @@ async function loadAndRenderTrendChart() {
                     border: { display: false },
                 },
                 y: {
-                    grid: { color: '#f3f4f6' },
+                    grid: { color: '#f8f9fa', lineWidth: 1 },
                     ticks: {
                         font: { size: 11 },
                         color: '#9ca3af',
                         callback: v => minutesToHhMm(v),
+                        maxTicksLimit: 6,
                     },
                     border: { display: false },
                 }
