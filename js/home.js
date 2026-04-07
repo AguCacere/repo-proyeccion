@@ -707,32 +707,26 @@ function renderTopMotivos(rows) {
     const sorted = Object.values(map).sort((a, b) => b.totalMin - a.totalMin).slice(0, 5);
     const maxMin = sorted[0]?.totalMin || 1;
 
-    // Accent bar: proportional height (12px–28px) and opacity-based color
-    const rowsHtml = sorted.map((item) => {
-        const ratio   = item.totalMin / maxMin;           // 0..1
-        const barH    = Math.round(12 + ratio * 16);      // 12px..28px
-        const opacity = (0.35 + ratio * 0.65).toFixed(2); // 0.35..1.00
+    // Rank-based list with progress bars and time pills
+    const rankClasses = ['rank-1', 'rank-2', 'rank-3', '', ''];
+    const rowsHtml = sorted.map((item, idx) => {
+        const ratio    = item.totalMin / maxMin;
+        const barW     = Math.round(ratio * 100);
+        const rankCls  = rankClasses[idx] || '';
         return `
-        <tr>
-            <td class="motivo-cell"
-                style="--accent-bar-color: rgba(59,130,246,${opacity}); --accent-bar-h: ${barH}px">
-                <span class="motivo-text" title="${_esc(item.motivo)}">${_esc(item.motivo)}</span>
-            </td>
-            <td class="tiempo-cell">${minutesToHhMm(item.totalMin)}</td>
-        </tr>`;
+        <div class="motivo-list-item">
+            <div class="motivo-rank-badge ${rankCls}">${idx + 1}</div>
+            <div class="motivo-main">
+                <div class="motivo-main-text" title="${_esc(item.motivo)}">${_esc(item.motivo)}</div>
+                <div class="motivo-bar-track">
+                    <div class="motivo-bar-fill" style="width:${barW}%"></div>
+                </div>
+            </div>
+            <div class="motivo-tiempo-pill">${minutesToHhMm(item.totalMin)}</div>
+        </div>`;
     }).join('');
 
-    container.innerHTML = `
-        <table class="top-table">
-            <thead>
-                <tr>
-                    <th class="col-motivo">Motivo</th>
-                    <th class="col-tiempo">Tiempo total</th>
-                </tr>
-            </thead>
-            <tbody>${rowsHtml}</tbody>
-        </table>
-    `;
+    container.innerHTML = `<div class="motivo-list">${rowsHtml}</div>`;
 }
 
 // ── AI Insight ────────────────────────────────────────────────────────────────
