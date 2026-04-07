@@ -984,6 +984,20 @@ function initFilter() {
 
 }
 
+// ── Comparativo helpers ───────────────────────────────────────────────────────
+// Given a real-time string "HH:MM:SS" and delay in minutes, returns expected time without delay
+function subtractDelay(horarioReal, demoraMinutes) {
+    if (!horarioReal || demoraMinutes <= 0) return '';
+    const parts = horarioReal.split(':').map(Number);
+    if (parts.length < 2 || isNaN(parts[0])) return '';
+    const totalMin   = parts[0] * 60 + parts[1];
+    const expectMin  = totalMin - Math.round(demoraMinutes);
+    if (expectMin < 0) return '';
+    const h = Math.floor(expectMin / 60) % 24;
+    const m = Math.round(expectMin % 60);
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
 // ── Análisis Comparativo ──────────────────────────────────────────────────────
 
 async function openComparativoModal() {
@@ -992,6 +1006,12 @@ async function openComparativoModal() {
 
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+
+    // Update header subtitle with active period
+    const subEl = document.getElementById('compHeaderSub');
+    if (subEl && activeFrom && activeTo) {
+        subEl.textContent = `Período activo: ${buildSubtitle(activeFrom, activeTo)}`;
+    }
 
     // Populate Tipo dropdown — fetch cache if not ready yet
     const tipoSel = document.getElementById('compTipo');
@@ -1024,14 +1044,27 @@ function closeComparativoModal() {
     document.body.style.overflow = '';
 }
 
-function renderComparativoColumn(rows, title, periodLabel) {
-    const kpis = calcKPIs(rows);
+function renderComparativoColumn(rows, title, periodLabel, otherKpis, isCurrent) {
+    const kpis    = calcKPIs(rows);
+    const colCls  = isCurrent ? 'comp-col comp-col--current' : 'comp-col comp-col--prev';
+
+    function delta(current, other, lowerIsBetter) {
+        if (other == null || other === 0) return '';
+        const diff = current - other;
+        if (diff === 0) return '<span class="comp-delta neutral">=</span>';
+        const pct    = Math.round(Math.abs(diff / other) * 100);
+        const better = lowerIsBetter ? diff < 0 : diff > 0;
+        const arrow  = diff > 0 ? '▲' : '▼';
+        return `<span class="comp-delta ${better ? 'better' : 'worse'}">${arrow} ${pct}%</span>`;
+    }
 
     if (rows.length === 0) {
         return `
-        <div class="comp-col">
-            <div class="comp-col-title">${_esc(title)}</div>
-            <div class="comp-col-period">${_esc(periodLabel)}</div>
+        <div class="${colCls}">
+            <div class="comp-col-header">
+                <div class="comp-col-title">${_esc(title)}</div>
+                <div class="comp-col-period">${_esc(periodLabel)}</div>
+            </div>
             <div class="comp-empty">
                 <span class="comp-empty-icon">📭</span>
                 <span>Sin registros para este período y filtro</span>
@@ -1043,40 +1076,61 @@ function renderComparativoColumn(rows, title, periodLabel) {
     <div class="comp-kpis">
         <div class="comp-kpi-card">
             <div class="comp-kpi-label">Registros</div>
-            <div class="comp-kpi-value">${kpis.total}</div>
+            <div class="comp-kpi-value">${kpis.total}${otherKpis ? delta(kpis.total, otherKpis.total, false) : ''}</div>
         </div>
         <div class="comp-kpi-card">
             <div class="comp-kpi-label">Con demora</div>
-            <div class="comp-kpi-value">${kpis.pctDelay}%</div>
+            <div class="comp-kpi-value">${kpis.pctDelay}%${otherKpis ? delta(kpis.pctDelay, otherKpis.pctDelay, true) : ''}</div>
         </div>
         <div class="comp-kpi-card">
             <div class="comp-kpi-label">Tiempo acum.</div>
-            <div class="comp-kpi-value">${minutesToHhMm(kpis.acumMinutes)}</div>
+            <div class="comp-kpi-value">${minutesToHhMm(kpis.acumMinutes)}${otherKpis ? delta(kpis.acumMinutes, otherKpis.acumMinutes, true) : ''}</div>
         </div>
         <div class="comp-kpi-card">
             <div class="comp-kpi-label">Promedio</div>
-            <div class="comp-kpi-value">${minutesToHhMm(kpis.avgMinutes)}</div>
+            <div class="comp-kpi-value">${minutesToHhMm(kpis.avgMinutes)}${otherKpis ? delta(kpis.avgMinutes, otherKpis.avgMinutes, true) : ''}</div>
         </div>
     </div>`;
 
     const rowsHtml = rows.map(r => {
-        const hasDelay = r.demoraMinutes > 0;
+        const hasDelay      = r.demoraMinutes > 0;
         const dateFormatted = r.fecha.split('-').reverse().join('/');
+        const horaFin       = r.horarioReal ? r.horarioReal.slice(0, 5) : '';
+        const sinDemora     = hasDelay ? subtractDelay(r.horarioReal, r.demoraMinutes) : '';
+
+        const detailHtml = hasDelay
+            ? `<div class="comp-row-detail">
+                <span class="comp-row-badge delay">⚠ ${_esc(r.demoras.slice(0,5))}</span>
+                ${sinDemora ? `<span class="comp-row-sindemora">Sin dem: ${_esc(sinDemora)}</span>` : ''}
+                ${r.motivoDemora ? `<span class="comp-row-motivo">${_esc(r.motivoDemora)}</span>` : ''}
+               </div>`
+            : `<div class="comp-row-detail"><span class="comp-row-badge ok">✓ Sin demora</span></div>`;
+
         return `
         <div class="comp-row ${hasDelay ? 'has-delay' : ''}">
-            <div class="comp-row-date">${_esc(dateFormatted)}</div>
-            <div class="comp-row-dia">${_esc(r.diaSemana || '—')}</div>
-            <div class="comp-row-tipo">${_esc(r.tipo || '—')}</div>
-            <div class="comp-row-demora ${hasDelay ? 'bad' : 'ok'}">${hasDelay ? _esc(r.demoras) : 'Sin demora'}</div>
+            <div class="comp-row-main">
+                <div class="comp-row-left">
+                    <span class="comp-row-date">${_esc(dateFormatted)}</span>
+                    <span class="comp-row-dia">${_esc(r.diaSemana || '')}</span>
+                    <span class="comp-row-tipo">${_esc(r.tipo || '—')}</span>
+                </div>
+                ${horaFin ? `<div class="comp-row-hora">Fin ${_esc(horaFin)}</div>` : ''}
+            </div>
+            ${detailHtml}
         </div>`;
     }).join('');
 
     return `
-    <div class="comp-col">
-        <div class="comp-col-title">${_esc(title)}</div>
-        <div class="comp-col-period">${_esc(periodLabel)}</div>
+    <div class="${colCls}">
+        <div class="comp-col-header">
+            <div class="comp-col-title">${_esc(title)}</div>
+            <div class="comp-col-period">${_esc(periodLabel)}</div>
+        </div>
         ${kpiHtml}
-        <div class="comp-rows">${rowsHtml}</div>
+        <div class="comp-rows-wrap">
+            <div class="comp-rows-label">Registros (${rows.length})</div>
+            <div class="comp-rows">${rowsHtml}</div>
+        </div>
     </div>`;
 }
 
@@ -1131,12 +1185,14 @@ async function runComparativo() {
         const filteredCurrent = applyFilters(currentRows);
         const filteredPrev    = applyFilters(prevRows);
 
+        const kpisCurrent = calcKPIs(filteredCurrent);
+        const kpisPrev    = calcKPIs(filteredPrev);
         const currentLabel = buildSubtitle(activeFrom, activeTo);
         const prevLabel    = buildSubtitle(prev.from, prev.to);
 
         resultsEl.innerHTML = `<div class="comp-cols">
-            ${renderComparativoColumn(filteredCurrent, 'Período actual', currentLabel)}
-            ${renderComparativoColumn(filteredPrev, 'Período anterior', prevLabel)}
+            ${renderComparativoColumn(filteredCurrent, 'Período actual',   currentLabel, kpisPrev,    true)}
+            ${renderComparativoColumn(filteredPrev,    'Período anterior', prevLabel,    kpisCurrent, false)}
         </div>`;
     } catch (err) {
         resultsEl.innerHTML = `<div class="comp-empty"><span class="comp-empty-icon">⚠️</span><span>Error al cargar datos: ${_esc(err.message)}</span></div>`;
