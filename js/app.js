@@ -1496,7 +1496,6 @@ function renderChart(data) {
 
     // Actualizar indicadores en el DOM
     document.getElementById('chartAvgDev').innerText = `${avgDev > 0 ? '+' : ''}${avgDev}%`;
-    document.getElementById('chartAnomalies').innerText = anomalies;
     document.getElementById('chartMaxDev').innerText = `${maxDev > 0 ? '+' : ''}${maxDev.toFixed(1)}%`;
 
     const pointColors = realData.map((val, i) => (val > maxData[i] && maxData[i] > 0) ? '#ff3b30' : '#007aff');
