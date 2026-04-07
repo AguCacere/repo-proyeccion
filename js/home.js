@@ -986,16 +986,22 @@ function initFilter() {
 
 // ── Análisis Comparativo ──────────────────────────────────────────────────────
 
-function openComparativoModal() {
+async function openComparativoModal() {
     const overlay = document.getElementById('compOverlay');
     if (!overlay) return;
 
-    // Populate Tipo dropdown from cache
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    // Populate Tipo dropdown — fetch cache if not ready yet
     const tipoSel = document.getElementById('compTipo');
-    if (tipoSel && _allRowsCache) {
-        const tipos = [...new Set(_allRowsCache.map(r => r.tipo).filter(Boolean))].sort();
-        tipoSel.innerHTML = '<option value="">Todos los tipos</option>' +
-            tipos.map(t => `<option value="${_esc(t)}">${_esc(t)}</option>`).join('');
+    if (tipoSel) {
+        try {
+            const all  = await fetchAllRows();
+            const tipos = [...new Set(all.map(r => r.tipo).filter(t => t && t !== 'Sin especificar'))].sort();
+            tipoSel.innerHTML = '<option value="">Todos los tipos</option>' +
+                tipos.map(t => `<option value="${_esc(t)}">${_esc(t)}</option>`).join('');
+        } catch (_) { /* keep default option */ }
     }
 
     // Populate Día dropdown
@@ -1009,9 +1015,6 @@ function openComparativoModal() {
     // Clear previous results
     const resultsEl = document.getElementById('compResults');
     if (resultsEl) resultsEl.innerHTML = '';
-
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
 }
 
 function closeComparativoModal() {
