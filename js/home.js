@@ -38,6 +38,7 @@ function lastDayOfMonth(year, month) {
 
 const MONTH_NAMES_ES      = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MONTH_NAMES_FULL_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DAYS_ES             = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
 // ── Parsing helpers ───────────────────────────────────────────────────────────
 function parseDemoraToMinutes(str) {
@@ -305,14 +306,19 @@ async function fetchAllRows() {
 
     const { data, error } = result;
     if (error) { console.error('Supabase error:', error); throw new Error(error.message); }
-    _allRowsCache = (data || []).map(r => ({
-        fecha: normalizeFecha(r.Fecha),
-        tipo: _cleanTipo(r.Tipo),
-        horarioReal: r.HorarioReal || '',
-        demoras: r.Demoras || '',
-        motivoDemora: r.MotivoDemora || '',
-        demoraMinutes: parseDemoraToMinutes(r.Demoras),
-    }));
+    _allRowsCache = (data || []).map(r => {
+        const fecha = normalizeFecha(r.Fecha);
+        const dayIdx = fecha ? parseYMD(fecha).getDay() : -1;
+        return {
+            fecha,
+            tipo: _cleanTipo(r.Tipo),
+            horarioReal: r.HorarioReal || '',
+            demoras: r.Demoras || '',
+            motivoDemora: r.MotivoDemora || '',
+            demoraMinutes: parseDemoraToMinutes(r.Demoras),
+            diaSemana: dayIdx >= 0 ? DAYS_ES[dayIdx] : '',
+        };
+    });
     return _allRowsCache;
 }
 
@@ -958,6 +964,14 @@ function initFilter() {
         applyFilter();
     });
 
+    // Comparativo button
+    document.getElementById('btnComparativo')?.addEventListener('click', openComparativoModal);
+    document.getElementById('btnCloseComp')?.addEventListener('click', closeComparativoModal);
+    document.getElementById('compOverlay')?.addEventListener('click', e => {
+        if (e.target === document.getElementById('compOverlay')) closeComparativoModal();
+    });
+    document.getElementById('btnAnalizar')?.addEventListener('click', runComparativo);
+
     // AI regenerate button
     document.getElementById('btnRegenAI')?.addEventListener('click', () => {
         const btn = document.getElementById('btnRegenAI');
@@ -968,6 +982,162 @@ function initFilter() {
             .finally(() => btn.classList.remove('spinning'));
     });
 
+}
+
+// ── Análisis Comparativo ──────────────────────────────────────────────────────
+
+function openComparativoModal() {
+    const overlay = document.getElementById('compOverlay');
+    if (!overlay) return;
+
+    // Populate Tipo dropdown from cache
+    const tipoSel = document.getElementById('compTipo');
+    if (tipoSel && _allRowsCache) {
+        const tipos = [...new Set(_allRowsCache.map(r => r.tipo).filter(Boolean))].sort();
+        tipoSel.innerHTML = '<option value="">Todos los tipos</option>' +
+            tipos.map(t => `<option value="${_esc(t)}">${_esc(t)}</option>`).join('');
+    }
+
+    // Populate Día dropdown
+    const diaSel = document.getElementById('compDia');
+    if (diaSel) {
+        diaSel.innerHTML = '<option value="">Todos los días</option>' +
+            DAYS_ES.map(d => `<option value="${_esc(d)}">${_esc(d)}</option>`).join('');
+    }
+
+    // Clear previous results
+    const resultsEl = document.getElementById('compResults');
+    if (resultsEl) resultsEl.innerHTML = '';
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeComparativoModal() {
+    const overlay = document.getElementById('compOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function renderComparativoColumn(rows, title, periodLabel) {
+    const kpis = calcKPIs(rows);
+
+    if (rows.length === 0) {
+        return `
+        <div class="comp-col">
+            <div class="comp-col-title">${_esc(title)}</div>
+            <div class="comp-col-period">${_esc(periodLabel)}</div>
+            <div class="comp-empty">
+                <span class="comp-empty-icon">📭</span>
+                <span>Sin registros para este período y filtro</span>
+            </div>
+        </div>`;
+    }
+
+    const kpiHtml = `
+    <div class="comp-kpis">
+        <div class="comp-kpi-card">
+            <div class="comp-kpi-label">Registros</div>
+            <div class="comp-kpi-value">${kpis.total}</div>
+        </div>
+        <div class="comp-kpi-card">
+            <div class="comp-kpi-label">Con demora</div>
+            <div class="comp-kpi-value">${kpis.pctDelay}%</div>
+        </div>
+        <div class="comp-kpi-card">
+            <div class="comp-kpi-label">Tiempo acum.</div>
+            <div class="comp-kpi-value">${minutesToHhMm(kpis.acumMinutes)}</div>
+        </div>
+        <div class="comp-kpi-card">
+            <div class="comp-kpi-label">Promedio</div>
+            <div class="comp-kpi-value">${minutesToHhMm(kpis.avgMinutes)}</div>
+        </div>
+    </div>`;
+
+    const rowsHtml = rows.map(r => {
+        const hasDelay = r.demoraMinutes > 0;
+        const dateFormatted = r.fecha.split('-').reverse().join('/');
+        return `
+        <div class="comp-row ${hasDelay ? 'has-delay' : ''}">
+            <div class="comp-row-date">${_esc(dateFormatted)}</div>
+            <div class="comp-row-tipo">${_esc(r.tipo || '—')}</div>
+            <div class="comp-row-demora ${hasDelay ? 'bad' : 'ok'}">${hasDelay ? _esc(r.demoras) : 'Sin demora'}</div>
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="comp-col">
+        <div class="comp-col-title">${_esc(title)}</div>
+        <div class="comp-col-period">${_esc(periodLabel)}</div>
+        ${kpiHtml}
+        <div class="comp-rows">${rowsHtml}</div>
+    </div>`;
+}
+
+async function runComparativo() {
+    const resultsEl = document.getElementById('compResults');
+    const btn       = document.getElementById('btnAnalizar');
+    if (!resultsEl || !btn) return;
+
+    const diaFilter  = document.getElementById('compDia')?.value  || '';
+    const tipoFilter = document.getElementById('compTipo')?.value || '';
+
+    // Skeleton
+    resultsEl.innerHTML = `
+    <div class="comp-cols">
+        <div class="comp-col comp-skeleton">
+            <div class="sk-line sk-title"></div>
+            <div class="sk-line sk-sub"></div>
+            <div class="sk-kpis">
+                <div class="sk-kpi"></div><div class="sk-kpi"></div>
+                <div class="sk-kpi"></div><div class="sk-kpi"></div>
+            </div>
+            <div class="sk-line"></div><div class="sk-line"></div><div class="sk-line sk-short"></div>
+        </div>
+        <div class="comp-col comp-skeleton">
+            <div class="sk-line sk-title"></div>
+            <div class="sk-line sk-sub"></div>
+            <div class="sk-kpis">
+                <div class="sk-kpi"></div><div class="sk-kpi"></div>
+                <div class="sk-kpi"></div><div class="sk-kpi"></div>
+            </div>
+            <div class="sk-line"></div><div class="sk-line"></div><div class="sk-line sk-short"></div>
+        </div>
+    </div>`;
+
+    btn.disabled = true;
+
+    try {
+        const prev = prevPeriodRange(activeFrom, activeTo);
+        const [currentRows, prevRows] = await Promise.all([
+            fetchRangeData(activeFrom, activeTo),
+            fetchRangeData(prev.from, prev.to),
+        ]);
+
+        function applyFilters(rows) {
+            return rows.filter(r => {
+                if (diaFilter  && r.diaSemana !== diaFilter)  return false;
+                if (tipoFilter && r.tipo      !== tipoFilter) return false;
+                return true;
+            });
+        }
+
+        const filteredCurrent = applyFilters(currentRows);
+        const filteredPrev    = applyFilters(prevRows);
+
+        const currentLabel = buildSubtitle(activeFrom, activeTo);
+        const prevLabel    = buildSubtitle(prev.from, prev.to);
+
+        resultsEl.innerHTML = `<div class="comp-cols">
+            ${renderComparativoColumn(filteredCurrent, 'Período actual', currentLabel)}
+            ${renderComparativoColumn(filteredPrev, 'Período anterior', prevLabel)}
+        </div>`;
+    } catch (err) {
+        resultsEl.innerHTML = `<div class="comp-empty"><span class="comp-empty-icon">⚠️</span><span>Error al cargar datos: ${_esc(err.message)}</span></div>`;
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
