@@ -89,6 +89,41 @@
                         </div>
                     </div>
                     <button class="btn-apply" id="btnApply"><span class="btn-spinner"></span>Aplicar</button>
+                    <button class="btn-comparativo" id="btnComparativo">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        Análisis Comparativo
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal: Análisis Comparativo -->
+            <div class="comp-overlay" id="compOverlay">
+                <div class="comp-panel">
+                    <div class="comp-header">
+                        <div class="comp-header-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                            Análisis Comparativo
+                        </div>
+                        <button class="comp-close-btn" id="btnCloseComp" aria-label="Cerrar">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                    <div class="comp-filters">
+                        <div class="comp-filter-field">
+                            <label>Día de la semana</label>
+                            <select id="compDia">
+                                <option value="">Todos los días</option>
+                            </select>
+                        </div>
+                        <div class="comp-filter-field">
+                            <label>Tipo de proceso</label>
+                            <select id="compTipo">
+                                <option value="">Todos los tipos</option>
+                            </select>
+                        </div>
+                        <button class="btn-analizar" id="btnAnalizar">Analizar</button>
+                    </div>
+                    <div class="comp-results" id="compResults"></div>
                 </div>
             </div>
 
