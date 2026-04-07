@@ -256,8 +256,8 @@ async function fetchProjections() {
 
             // Limpieza de caracteres especiales (ej: Da -> Día, Hbil -> Hábil)
             let cleanTipo = (item.Tipo || 'Normal').replace(/D[íì]?a/g, 'Día').replace(/H[áà]?bil/g, 'Hábil');
-            // Si el texto es literal "Da" o "Da"
-            if (cleanTipo === "Da" || cleanTipo === "Da") cleanTipo = "Día";
+            // Si el texto es literal "Da"
+            if (cleanTipo === "Da") cleanTipo = "Día";
             if (cleanTipo.startsWith("D a")) cleanTipo = cleanTipo.replace("D a", "Día");
 
             // Función interna para forzar formato HH:MM o HH:MM:SS
