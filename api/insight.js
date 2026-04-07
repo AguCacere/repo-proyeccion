@@ -10,6 +10,13 @@ export default async function handler(req, res) {
 
   const { kpis, demoras } = req.body;
 
+  if (typeof kpis !== 'string' || typeof demoras !== 'string') {
+    return res.status(400).json({ error: 'kpis and demoras must be strings' });
+  }
+  if (kpis.length > 4000 || demoras.length > 8000) {
+    return res.status(400).json({ error: 'Input too large' });
+  }
+
   let response;
   try {
     response = await fetch('https://api.anthropic.com/v1/messages', {
