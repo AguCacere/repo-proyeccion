@@ -140,14 +140,17 @@
 
         <div class="chart-container">
             <div class="chart-header">
-                <h2>Gráfico Efectividad</h2>
+                <div>
+                    <h2>Efectividad del Horario Real</h2>
+                    <p class="chart-subtitle">Desvío entre ejecución real y proyección base — período seleccionado</p>
+                </div>
                 <div class="chart-legend-container" id="customLegend">
                     <div class="legend-item">
-                        <span class="legend-dot" style="background-color: #0055ff;"></span>
+                        <span class="legend-line" style="background-color: #0055ff;"></span>
                         <span class="legend-label">Ejecución Real</span>
                     </div>
                     <div class="legend-item">
-                        <span class="legend-dot" style="background-color: #c1c1c6; border: 1px dashed #777;"></span>
+                        <span class="legend-line legend-line-dashed"></span>
                         <span class="legend-label">Proyección (Base)</span>
                     </div>
                 </div>
@@ -155,16 +158,34 @@
 
             <div class="chart-summary-row">
                 <div class="chart-summary-item mini-card">
-                    <span class="label">Promedio</span>
-                    <span class="value" id="chartAvgDev">0%</span>
+                    <div class="csi-header">
+                        <span class="csi-icon csi-blue">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        </span>
+                        <span class="csi-label">Desvío Promedio</span>
+                    </div>
+                    <span class="csi-value" id="chartAvgDev">—</span>
+                    <span class="csi-sub">promedio de desvío diario del período</span>
                 </div>
                 <div class="chart-summary-item mini-card">
-                    <span class="label">Desvíos</span>
-                    <span class="value anomaly-value" id="chartAnomalies">0</span>
+                    <div class="csi-header">
+                        <span class="csi-icon csi-red">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        </span>
+                        <span class="csi-label">Días fuera de proyección</span>
+                    </div>
+                    <span class="csi-value anomaly-value" id="chartAnomalies">—</span>
+                    <span class="csi-sub">días con desvío detectado en el período</span>
                 </div>
                 <div class="chart-summary-item mini-card">
-                    <span class="label">Mayor Desviación</span>
-                    <span class="value" id="chartMaxDev">0%</span>
+                    <div class="csi-header">
+                        <span class="csi-icon csi-amber">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                        </span>
+                        <span class="csi-label">Máx. Desviación</span>
+                    </div>
+                    <span class="csi-value" id="chartMaxDev">—</span>
+                    <span class="csi-sub">mayor desvío registrado en un día del período</span>
                 </div>
             </div>
 
