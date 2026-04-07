@@ -1774,6 +1774,13 @@ async function addNewRecord() {
         return;
     }
 
+    // Prevenir fecha duplicada
+    const alreadyExists = window.projectionData?.some(r => r.fecha === dateVal);
+    if (alreadyExists) {
+        showToast(`Ya existe un registro para el ${dateVal.split('-').reverse().join('/')}. Editá el existente.`, 'error');
+        return;
+    }
+
     const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const diaSemana = days[new Date(dateVal + 'T00:00:00').getDay()];
 
@@ -2014,48 +2021,24 @@ function openDeleteModal(id, date) {
 
 async function confirmDeleteRecord(id) {
     closeModal('deleteConfirmModal');
-
-    // Log intent
     addLog(`Iniciando eliminación del registro ID: ${id}...`, "info");
 
     try {
-        const item = window.projectionData.find(p => p.id == id);
-        const columnsToTry = [item?._idSource, 'id', 'ID', 'Id'].filter(c => c);
-        const uniqueColumns = [...new Set(columnsToTry)];
-        
-        let success = false;
-        let lastError = null;
+        const { error, count } = await supabaseClient
+            .from('Estimacion')
+            .delete({ count: 'exact' })
+            .eq('id', Number(id));
 
-        for (const col of uniqueColumns) {
-            console.log(`Intentando eliminar usando columna: ${col}...`);
-            const { error, count } = await supabaseClient
-                .from('Estimacion')
-                .delete({ count: 'exact' })
-                .eq(col, id);
-
-            if (!error && count > 0) {
-                success = true;
-                break;
-            }
-            if (error) {
-                console.warn(`Fallo al eliminar con ${col}:`, error.message);
-                lastError = error;
-            }
-        }
-
-        if (!success) {
-            const msg = lastError ? lastError.message : "No se encontró el registro para eliminar.";
-            showToast(msg, 'warning');
-            return;
-        }
+        if (error) throw error;
+        if (count === 0) throw new Error('No se encontró el registro para eliminar.');
 
         addLog(`Registro ID: ${id} eliminado con éxito.`, "info");
         showToast("Registro eliminado con éxito");
         await fetchProjections();
     } catch (err) {
-        console.error('Error crítico eliminando registro:', err);
-        addLog(`Fallo de sistema: ${err.message}`, "error");
-        showToast(`Error de sistema: ${err.message}`, 'error');
+        console.error('Error eliminando registro:', err);
+        addLog(`Fallo al eliminar: ${err.message}`, "error");
+        showToast(`Error: ${err.message}`, 'error');
     }
 }
 
