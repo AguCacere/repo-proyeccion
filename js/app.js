@@ -1088,6 +1088,24 @@ function renderStats(data) {
     animateValue(document.getElementById('avgDelay'), 0, avgDelayRaw, DURATION,
         n => Math.round(n) + ' min');
 
+    // Dynamic trend subtexts
+    const failPct = total > 0 ? ((failDays / total) * 100).toFixed(0) : 0;
+    const totalDelayFormatted = totalDelayMin >= 60
+        ? `${Math.floor(totalDelayMin / 60)}h ${totalDelayMin % 60}m acum.`
+        : `${Math.round(totalDelayMin)} min acum.`;
+
+    const elTrendEff = document.getElementById('trendEffectiveness');
+    if (elTrendEff) elTrendEff.textContent = `${total} día${total !== 1 ? 's' : ''} analizados`;
+
+    const elTrendOk = document.getElementById('trendOk');
+    if (elTrendOk) elTrendOk.textContent = `${((okDays / total) * 100).toFixed(0)}% del período`;
+
+    const elTrendFail = document.getElementById('trendFail');
+    if (elTrendFail) elTrendFail.textContent = failDays > 0 ? `${failPct}% del período` : 'Sin incidentes';
+
+    const elTrendDelay = document.getElementById('trendDelay');
+    if (elTrendDelay) elTrendDelay.textContent = totalDelayMin > 0 ? totalDelayFormatted : 'Sin demoras';
+
     // Re-trigger fadeInUp on each stat card
     document.querySelectorAll('.stat-card').forEach((card, i) => {
         card.style.animation = 'none';
@@ -1099,6 +1117,9 @@ function renderStats(data) {
 function renderTable(data) {
     const tbody = document.getElementById('dataTableBody');
     tbody.innerHTML = '';
+
+    const countEl = document.getElementById('tableRecordCount');
+    if (countEl) countEl.textContent = `${data.length} registro${data.length !== 1 ? 's' : ''}`;
 
     // Actualizar indicadores de orden en el header
     document.querySelectorAll('th[data-sort]').forEach(th => {
