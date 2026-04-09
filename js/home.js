@@ -970,6 +970,90 @@ function initFilter() {
 
 }
 
+// ── PDF Export ────────────────────────────────────────────────────────────────
+async function exportDashboardPDF() {
+    const btn = document.getElementById('btnExportPDF');
+    btn.disabled = true;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Generando…`;
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const pdf         = new jsPDF('p', 'mm', 'a4');
+        const pageWidth   = 210;
+        const pageHeight  = 297;
+        const margin      = 12;
+        const contentW    = pageWidth - margin * 2;
+
+        // ── Header del PDF ──
+        pdf.setFontSize(18);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('SQR Tracker — Resumen de demoras', margin, 20);
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(100);
+        const periodoTexto = document.getElementById('pageSubtitle')?.textContent || '';
+        pdf.text(periodoTexto, margin, 27);
+        pdf.setTextColor(0);
+        // Línea separadora
+        pdf.setDrawColor(230, 230, 230);
+        pdf.line(margin, 31, pageWidth - margin, 31);
+
+        let cursorY = 38;
+
+        const secciones = [
+            'seccion-kpis',
+            'seccion-donuts',
+            'seccion-tendencia',
+            'seccion-motivos',
+            'seccion-insight',
+        ];
+
+        for (const id of secciones) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+
+            const canvas = await html2canvas(el, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                logging: false,
+            });
+
+            const imgData   = canvas.toDataURL('image/png');
+            const imgProps  = pdf.getImageProperties(imgData);
+            const imgHeight = (imgProps.height * contentW) / imgProps.width;
+
+            if (cursorY + imgHeight > pageHeight - margin - 10) {
+                pdf.addPage();
+                cursorY = margin;
+            }
+
+            pdf.addImage(imgData, 'PNG', margin, cursorY, contentW, imgHeight);
+            cursorY += imgHeight + 8;
+        }
+
+        // ── Footer en cada página ──
+        const totalPages = pdf.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            pdf.setPage(i);
+            pdf.setFontSize(9);
+            pdf.setTextColor(150);
+            pdf.text(`SQR Tracker · Página ${i} de ${totalPages}`, margin, pageHeight - 6);
+            const fecha = new Date().toLocaleDateString('es-AR');
+            pdf.text(`Generado el ${fecha}`, pageWidth - margin, pageHeight - 6, { align: 'right' });
+        }
+
+        const fechaArchivo = new Date().toISOString().slice(0, 7);
+        pdf.save(`sqr-tracker-${fechaArchivo}.pdf`);
+    } catch (err) {
+        console.error('[exportPDF]', err);
+        alert('Error al generar el PDF: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Exportar PDF`;
+    }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
     _allRowsCache = null; // fresh fetch on each page load
@@ -980,4 +1064,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Initial data load with default range
     applyFilter();
+
+    // PDF export
+    document.getElementById('btnExportPDF')?.addEventListener('click', exportDashboardPDF);
 });

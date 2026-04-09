@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="css/style.css?v=4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         /* ── Page background ── */
         body { background-color: #f8f9fa; }
@@ -18,7 +21,12 @@
 
         .home-header {
             margin-bottom: 32px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
         }
+        .home-header-text { flex: 1; min-width: 0; }
 
         .home-header h1 {
             font-size: 1.5rem;
@@ -713,6 +721,35 @@
             .donut-canvas-wrap { width: 140px; height: 140px; }
         }
 
+        /* ── Export PDF button ── */
+        .btn-export-pdf {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #ffffff;
+            color: #4B5563;
+            border: 1px solid #D1D5DB;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 0.84rem;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .btn-export-pdf:hover:not(:disabled) {
+            border-color: #6B7280;
+            color: #111827;
+            background: #F9FAFB;
+        }
+        .btn-export-pdf:disabled {
+            opacity: 0.55;
+            cursor: default;
+        }
+        .btn-export-pdf svg { color: #6B7280; }
+
         /* ── Enhanced panel headers ── */
         .panel-header {
             display: flex;
@@ -866,8 +903,14 @@
 
             <!-- Header -->
             <div class="home-header">
-                <h1 id="pageTitle">Inicio</h1>
-                <p id="pageSubtitle">Cargando datos del mes actual…</p>
+                <div class="home-header-text">
+                    <h1 id="pageTitle">Inicio</h1>
+                    <p id="pageSubtitle">Cargando datos del mes actual…</p>
+                </div>
+                <button class="btn-export-pdf" id="btnExportPDF">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Exportar PDF
+                </button>
             </div>
 
             <!-- Filter bar -->
@@ -905,7 +948,7 @@
             </div>
 
             <!-- Sección 1: KPI Cards -->
-            <div class="kpi-grid">
+            <div class="kpi-grid" id="seccion-kpis">
                 <!-- Total registros -->
                 <div class="kpi-card">
                     <div class="kpi-card-body">
@@ -956,7 +999,7 @@
             </div>
 
             <!-- Sección 3: Donuts -->
-            <div class="donut-grid">
+            <div class="donut-grid" id="seccion-donuts">
                 <div class="panel">
                     <div class="panel-header">
                         <div class="panel-header-left">
@@ -1004,7 +1047,7 @@
             <!-- Sección 4: Gráfico + Tabla top motivos -->
             <div class="mid-grid">
                 <!-- Gráfico de tendencia (últimos 6 meses) -->
-                <div class="panel">
+                <div class="panel" id="seccion-tendencia">
                     <div class="panel-header">
                         <div class="panel-header-left">
                             <div class="panel-hicon ph-blue">
@@ -1023,7 +1066,7 @@
                 </div>
 
                 <!-- Top 5 motivos -->
-                <div class="panel">
+                <div class="panel" id="seccion-motivos">
                     <div class="panel-header">
                         <div class="panel-header-left">
                             <div class="panel-hicon ph-red">
@@ -1045,7 +1088,7 @@
             </div>
 
             <!-- Sección 5: AI Insight -->
-            <div class="ai-panel">
+            <div class="ai-panel" id="seccion-insight">
                 <div class="ai-header">
                     <div class="ai-icon-wrap">✦</div>
                     <div style="flex:1;min-width:0">
@@ -1071,7 +1114,7 @@
 
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase-client.js?v=5"></script>
-    <script src="js/home.js?v=5"></script>
+    <script src="js/supabase-client.js?v=6"></script>
+    <script src="js/home.js?v=6"></script>
 </body>
 </html>
