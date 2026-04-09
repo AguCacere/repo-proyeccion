@@ -9,8 +9,6 @@
     <link rel="stylesheet" href="css/home.css?v=2">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 
 <body>
@@ -60,10 +58,6 @@
                     <h1 id="pageTitle">Inicio</h1>
                     <p id="pageSubtitle">Cargando datos del mes actual…</p>
                 </div>
-                <button class="btn-export-pdf" id="btnExportPDF">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Exportar PDF
-                </button>
             </div>
 
             <!-- Filter bar -->
@@ -249,7 +243,10 @@
                                 <div class="panel-hsub">Tiempo acumulado mensual</div>
                             </div>
                         </div>
-                        <span class="panel-hbadge">Últimos 6 meses</span>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span class="panel-hbadge">Últimos 6 meses</span>
+                            <button id="btnCopiarGrafico" style="background:transparent;border:0.5px solid #D1D5DB;border-radius:6px;padding:3px 9px;font-size:0.75rem;color:#6B7280;cursor:pointer;font-family:inherit;transition:color 0.15s,border-color 0.15s;" onmouseover="this.style.color='#111827';this.style.borderColor='#9CA3AF'" onmouseout="this.style.color='#6B7280';this.style.borderColor='#D1D5DB'">Copiar gráfico</button>
+                        </div>
                     </div>
                     <div class="chart-wrapper">
                         <canvas id="trendChart"></canvas>
@@ -306,6 +303,6 @@
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabase-client.js?v=5"></script>
-    <script src="js/home.js?v=7"></script>
+    <script src="js/home.js?v=8"></script>
 </body>
 </html>

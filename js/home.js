@@ -1201,53 +1201,6 @@ async function runComparativo() {
     }
 }
 
-// ── PDF Export ────────────────────────────────────────────────────────────────
-async function exportDashboardPDF() {
-    const btn = document.getElementById('btnExportPDF');
-    btn.disabled = true;
-    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Generando…`;
-    try {
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageW = 210, pageH = 297, margin = 12, contentW = pageW - margin * 2;
-
-        // Header
-        pdf.setFontSize(18); pdf.setFont('helvetica', 'bold');
-        pdf.text('SQR Tracker — Resumen de demoras', margin, 20);
-        pdf.setFontSize(11); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100);
-        pdf.text(document.getElementById('pageSubtitle')?.textContent || '', margin, 27);
-        pdf.setTextColor(0); pdf.setDrawColor(230, 230, 230); pdf.line(margin, 31, pageW - margin, 31);
-
-        let y = 38;
-        for (const id of ['seccion-kpis', 'seccion-donuts', 'seccion-tendencia', 'seccion-insight']) {
-            const el = document.getElementById(id);
-            if (!el) continue;
-            const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
-            const imgData = canvas.toDataURL('image/png');
-            const props = pdf.getImageProperties(imgData);
-            const imgH = (props.height * contentW) / props.width;
-            if (y + imgH > pageH - margin - 10) { pdf.addPage(); y = margin; }
-            pdf.addImage(imgData, 'PNG', margin, y, contentW, imgH);
-            y += imgH + 8;
-        }
-
-        // Footer on each page
-        const total = pdf.getNumberOfPages();
-        for (let i = 1; i <= total; i++) {
-            pdf.setPage(i); pdf.setFontSize(9); pdf.setTextColor(150);
-            pdf.text(`SQR Tracker · Página ${i} de ${total}`, margin, pageH - 6);
-            pdf.text(`Generado el ${new Date().toLocaleDateString('es-AR')}`, pageW - margin, pageH - 6, { align: 'right' });
-        }
-
-        pdf.save(`sqr-tracker-${new Date().toISOString().slice(0, 7)}.pdf`);
-    } catch (err) {
-        alert('Error al generar el PDF: ' + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Exportar PDF`;
-    }
-}
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
     _allRowsCache = null; // fresh fetch on each page load
@@ -1259,5 +1212,19 @@ window.addEventListener('DOMContentLoaded', () => {
     // Initial data load with default range
     applyFilter();
 
-    document.getElementById('btnExportPDF')?.addEventListener('click', exportDashboardPDF);
+    document.getElementById('btnCopiarGrafico').addEventListener('click', async () => {
+        const canvas = document.getElementById('trendChart');
+        canvas.toBlob(async (blob) => {
+            try {
+                await navigator.clipboard.write([
+                    new ClipboardItem({ 'image/png': blob })
+                ]);
+                const btn = document.getElementById('btnCopiarGrafico');
+                btn.textContent = '✓ Copiado';
+                setTimeout(() => btn.textContent = 'Copiar gráfico', 2000);
+            } catch (e) {
+                alert('No se pudo copiar. Verificá que el sitio tiene permisos de portapapeles.');
+            }
+        });
+    });
 });
