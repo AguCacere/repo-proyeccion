@@ -38,6 +38,7 @@ function lastDayOfMonth(year, month) {
 
 const MONTH_NAMES_ES      = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MONTH_NAMES_FULL_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DAYS_ES             = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
 // ── Parsing helpers ───────────────────────────────────────────────────────────
 function parseDemoraToMinutes(str) {
@@ -305,14 +306,19 @@ async function fetchAllRows() {
 
     const { data, error } = result;
     if (error) { console.error('Supabase error:', error); throw new Error(error.message); }
-    _allRowsCache = (data || []).map(r => ({
-        fecha: normalizeFecha(r.Fecha),
-        tipo: _cleanTipo(r.Tipo),
-        horarioReal: r.HorarioReal || '',
-        demoras: r.Demoras || '',
-        motivoDemora: r.MotivoDemora || '',
-        demoraMinutes: parseDemoraToMinutes(r.Demoras),
-    }));
+    _allRowsCache = (data || []).map(r => {
+        const fecha = normalizeFecha(r.Fecha);
+        const dayIdx = fecha ? parseYMD(fecha).getDay() : -1;
+        return {
+            fecha,
+            tipo: _cleanTipo(r.Tipo),
+            horarioReal: r.HorarioReal || '',
+            demoras: r.Demoras || '',
+            motivoDemora: r.MotivoDemora || '',
+            demoraMinutes: parseDemoraToMinutes(r.Demoras),
+            diaSemana: dayIdx >= 0 ? DAYS_ES[dayIdx] : '',
+        };
+    });
     return _allRowsCache;
 }
 
@@ -958,6 +964,14 @@ function initFilter() {
         applyFilter();
     });
 
+    // Comparativo button
+    document.getElementById('btnComparativo')?.addEventListener('click', openComparativoModal);
+    document.getElementById('btnCloseComp')?.addEventListener('click', closeComparativoModal);
+    document.getElementById('compOverlay')?.addEventListener('click', e => {
+        if (e.target === document.getElementById('compOverlay')) closeComparativoModal();
+    });
+    document.getElementById('btnAnalizar')?.addEventListener('click', runComparativo);
+
     // AI regenerate button
     document.getElementById('btnRegenAI')?.addEventListener('click', () => {
         const btn = document.getElementById('btnRegenAI');
@@ -970,87 +984,220 @@ function initFilter() {
 
 }
 
-// ── PDF Export ────────────────────────────────────────────────────────────────
-async function exportDashboardPDF() {
-    const btn = document.getElementById('btnExportPDF');
+// ── Comparativo helpers ───────────────────────────────────────────────────────
+// Given a real-time string "HH:MM:SS" and delay in minutes, returns expected time without delay
+function subtractDelay(horarioReal, demoraMinutes) {
+    if (!horarioReal || demoraMinutes <= 0) return '';
+    const parts = horarioReal.split(':').map(Number);
+    if (parts.length < 2 || isNaN(parts[0])) return '';
+    const totalMin   = parts[0] * 60 + parts[1];
+    const expectMin  = totalMin - Math.round(demoraMinutes);
+    if (expectMin < 0) return '';
+    const h = Math.floor(expectMin / 60) % 24;
+    const m = Math.round(expectMin % 60);
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+// ── Análisis Comparativo ──────────────────────────────────────────────────────
+
+async function openComparativoModal() {
+    const overlay = document.getElementById('compOverlay');
+    if (!overlay) return;
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    // Update header subtitle with active period
+    const subEl = document.getElementById('compHeaderSub');
+    if (subEl && activeFrom && activeTo) {
+        subEl.textContent = `Período activo: ${buildSubtitle(activeFrom, activeTo)}`;
+    }
+
+    // Populate Tipo dropdown — fetch cache if not ready yet
+    const tipoSel = document.getElementById('compTipo');
+    if (tipoSel) {
+        try {
+            const all  = await fetchAllRows();
+            const tipos = [...new Set(all.map(r => r.tipo).filter(t => t && t !== 'Sin especificar'))].sort();
+            tipoSel.innerHTML = '<option value="">Todos los tipos</option>' +
+                tipos.map(t => `<option value="${_esc(t)}">${_esc(t)}</option>`).join('');
+        } catch (_) { /* keep default option */ }
+    }
+
+    // Populate Día dropdown
+    const diaSel = document.getElementById('compDia');
+    if (diaSel) {
+        const weekdays = DAYS_ES.filter(d => d !== 'Sábado' && d !== 'Domingo');
+        diaSel.innerHTML = '<option value="">Todos los días</option>' +
+            weekdays.map(d => `<option value="${_esc(d)}">${_esc(d)}</option>`).join('');
+    }
+
+    // Clear previous results
+    const resultsEl = document.getElementById('compResults');
+    if (resultsEl) resultsEl.innerHTML = '';
+}
+
+function closeComparativoModal() {
+    const overlay = document.getElementById('compOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function renderComparativoColumn(rows, title, periodLabel, otherKpis, isCurrent) {
+    const kpis    = calcKPIs(rows);
+    const colCls  = isCurrent ? 'comp-col comp-col--current' : 'comp-col comp-col--prev';
+
+    function delta(current, other, lowerIsBetter) {
+        if (other == null || other === 0) return '';
+        const diff = current - other;
+        if (diff === 0) return '<span class="comp-delta neutral">=</span>';
+        const pct    = Math.round(Math.abs(diff / other) * 100);
+        const better = lowerIsBetter ? diff < 0 : diff > 0;
+        const arrow  = diff > 0 ? '▲' : '▼';
+        return `<span class="comp-delta ${better ? 'better' : 'worse'}">${arrow} ${pct}%</span>`;
+    }
+
+    if (rows.length === 0) {
+        return `
+        <div class="${colCls}">
+            <div class="comp-col-header">
+                <div class="comp-col-title">${_esc(title)}</div>
+                <div class="comp-col-period">${_esc(periodLabel)}</div>
+            </div>
+            <div class="comp-empty">
+                <span class="comp-empty-icon">📭</span>
+                <span>Sin registros para este período y filtro</span>
+            </div>
+        </div>`;
+    }
+
+    const kpiHtml = `
+    <div class="comp-kpis">
+        <div class="comp-kpi-card">
+            <div class="comp-kpi-label">Registros</div>
+            <div class="comp-kpi-value">${kpis.total}${otherKpis ? delta(kpis.total, otherKpis.total, false) : ''}</div>
+        </div>
+        <div class="comp-kpi-card">
+            <div class="comp-kpi-label">Con demora</div>
+            <div class="comp-kpi-value">${kpis.pctDelay}%${otherKpis ? delta(kpis.pctDelay, otherKpis.pctDelay, true) : ''}</div>
+        </div>
+        <div class="comp-kpi-card">
+            <div class="comp-kpi-label">Tiempo acum.</div>
+            <div class="comp-kpi-value">${minutesToHhMm(kpis.acumMinutes)}${otherKpis ? delta(kpis.acumMinutes, otherKpis.acumMinutes, true) : ''}</div>
+        </div>
+        <div class="comp-kpi-card">
+            <div class="comp-kpi-label">Promedio</div>
+            <div class="comp-kpi-value">${minutesToHhMm(kpis.avgMinutes)}${otherKpis ? delta(kpis.avgMinutes, otherKpis.avgMinutes, true) : ''}</div>
+        </div>
+    </div>`;
+
+    const rowsHtml = rows.map(r => {
+        const hasDelay      = r.demoraMinutes > 0;
+        const dateFormatted = r.fecha.split('-').reverse().join('/');
+        const horaFin       = r.horarioReal ? r.horarioReal.slice(0, 5) : '';
+        const sinDemora     = hasDelay ? subtractDelay(r.horarioReal, r.demoraMinutes) : '';
+
+        const detailHtml = hasDelay
+            ? `<div class="comp-row-detail">
+                <span class="comp-row-badge delay">⚠ ${_esc(r.demoras.slice(0,5))}</span>
+                ${sinDemora ? `<span class="comp-row-sindemora">Sin dem: ${_esc(sinDemora)}</span>` : ''}
+                ${r.motivoDemora ? `<span class="comp-row-motivo">${_esc(r.motivoDemora)}</span>` : ''}
+               </div>`
+            : `<div class="comp-row-detail"><span class="comp-row-badge ok">✓ Sin demora</span></div>`;
+
+        return `
+        <div class="comp-row ${hasDelay ? 'has-delay' : ''}">
+            <div class="comp-row-main">
+                <div class="comp-row-left">
+                    <span class="comp-row-date">${_esc(dateFormatted)}</span>
+                    <span class="comp-row-dia">${_esc(r.diaSemana || '')}</span>
+                    <span class="comp-row-tipo">${_esc(r.tipo || '—')}</span>
+                </div>
+                ${horaFin ? `<div class="comp-row-hora">Fin ${_esc(horaFin)}</div>` : ''}
+            </div>
+            ${detailHtml}
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="${colCls}">
+        <div class="comp-col-header">
+            <div class="comp-col-title">${_esc(title)}</div>
+            <div class="comp-col-period">${_esc(periodLabel)}</div>
+        </div>
+        ${kpiHtml}
+        <div class="comp-rows-wrap">
+            <div class="comp-rows-label">Registros (${rows.length})</div>
+            <div class="comp-rows">${rowsHtml}</div>
+        </div>
+    </div>`;
+}
+
+async function runComparativo() {
+    const resultsEl = document.getElementById('compResults');
+    const btn       = document.getElementById('btnAnalizar');
+    if (!resultsEl || !btn) return;
+
+    const diaFilter  = document.getElementById('compDia')?.value  || '';
+    const tipoFilter = document.getElementById('compTipo')?.value || '';
+
+    // Skeleton
+    resultsEl.innerHTML = `
+    <div class="comp-cols">
+        <div class="comp-col comp-skeleton">
+            <div class="sk-line sk-title"></div>
+            <div class="sk-line sk-sub"></div>
+            <div class="sk-kpis">
+                <div class="sk-kpi"></div><div class="sk-kpi"></div>
+                <div class="sk-kpi"></div><div class="sk-kpi"></div>
+            </div>
+            <div class="sk-line"></div><div class="sk-line"></div><div class="sk-line sk-short"></div>
+        </div>
+        <div class="comp-col comp-skeleton">
+            <div class="sk-line sk-title"></div>
+            <div class="sk-line sk-sub"></div>
+            <div class="sk-kpis">
+                <div class="sk-kpi"></div><div class="sk-kpi"></div>
+                <div class="sk-kpi"></div><div class="sk-kpi"></div>
+            </div>
+            <div class="sk-line"></div><div class="sk-line"></div><div class="sk-line sk-short"></div>
+        </div>
+    </div>`;
+
     btn.disabled = true;
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Generando…`;
 
     try {
-        const { jsPDF } = window.jspdf;
-        const pdf         = new jsPDF('p', 'mm', 'a4');
-        const pageWidth   = 210;
-        const pageHeight  = 297;
-        const margin      = 12;
-        const contentW    = pageWidth - margin * 2;
+        const prev = prevPeriodRange(activeFrom, activeTo);
+        const [currentRows, prevRows] = await Promise.all([
+            fetchRangeData(activeFrom, activeTo),
+            fetchRangeData(prev.from, prev.to),
+        ]);
 
-        // ── Header del PDF ──
-        pdf.setFontSize(18);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('SQR Tracker — Resumen de demoras', margin, 20);
-        pdf.setFontSize(11);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(100);
-        const periodoTexto = document.getElementById('pageSubtitle')?.textContent || '';
-        pdf.text(periodoTexto, margin, 27);
-        pdf.setTextColor(0);
-        // Línea separadora
-        pdf.setDrawColor(230, 230, 230);
-        pdf.line(margin, 31, pageWidth - margin, 31);
-
-        let cursorY = 38;
-
-        const secciones = [
-            'seccion-kpis',
-            'seccion-donuts',
-            'seccion-tendencia',
-            'seccion-motivos',
-            'seccion-insight',
-        ];
-
-        for (const id of secciones) {
-            const el = document.getElementById(id);
-            if (!el) continue;
-
-            const canvas = await html2canvas(el, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                logging: false,
+        function applyFilters(rows) {
+            return rows.filter(r => {
+                if (diaFilter  && r.diaSemana !== diaFilter)  return false;
+                if (tipoFilter && r.tipo      !== tipoFilter) return false;
+                return true;
             });
-
-            const imgData   = canvas.toDataURL('image/png');
-            const imgProps  = pdf.getImageProperties(imgData);
-            const imgHeight = (imgProps.height * contentW) / imgProps.width;
-
-            if (cursorY + imgHeight > pageHeight - margin - 10) {
-                pdf.addPage();
-                cursorY = margin;
-            }
-
-            pdf.addImage(imgData, 'PNG', margin, cursorY, contentW, imgHeight);
-            cursorY += imgHeight + 8;
         }
 
-        // ── Footer en cada página ──
-        const totalPages = pdf.getNumberOfPages();
-        for (let i = 1; i <= totalPages; i++) {
-            pdf.setPage(i);
-            pdf.setFontSize(9);
-            pdf.setTextColor(150);
-            pdf.text(`SQR Tracker · Página ${i} de ${totalPages}`, margin, pageHeight - 6);
-            const fecha = new Date().toLocaleDateString('es-AR');
-            pdf.text(`Generado el ${fecha}`, pageWidth - margin, pageHeight - 6, { align: 'right' });
-        }
+        const filteredCurrent = applyFilters(currentRows);
+        const filteredPrev    = applyFilters(prevRows);
 
-        const fechaArchivo = new Date().toISOString().slice(0, 7);
-        pdf.save(`sqr-tracker-${fechaArchivo}.pdf`);
+        const kpisCurrent = calcKPIs(filteredCurrent);
+        const kpisPrev    = calcKPIs(filteredPrev);
+        const currentLabel = buildSubtitle(activeFrom, activeTo);
+        const prevLabel    = buildSubtitle(prev.from, prev.to);
+
+        resultsEl.innerHTML = `<div class="comp-cols">
+            ${renderComparativoColumn(filteredCurrent, 'Período actual',   currentLabel, kpisPrev,    true)}
+            ${renderComparativoColumn(filteredPrev,    'Período anterior', prevLabel,    kpisCurrent, false)}
+        </div>`;
     } catch (err) {
-        console.error('[exportPDF]', err);
-        alert('Error al generar el PDF: ' + err.message);
+        resultsEl.innerHTML = `<div class="comp-empty"><span class="comp-empty-icon">⚠️</span><span>Error al cargar datos: ${_esc(err.message)}</span></div>`;
     } finally {
         btn.disabled = false;
-        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Exportar PDF`;
     }
 }
 
@@ -1064,7 +1211,4 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Initial data load with default range
     applyFilter();
-
-    // PDF export
-    document.getElementById('btnExportPDF')?.addEventListener('click', exportDashboardPDF);
 });
