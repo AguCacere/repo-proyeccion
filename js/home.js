@@ -1211,4 +1211,49 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Initial data load with default range
     applyFilter();
+
+    // Helper: copy a <canvas> element to clipboard
+    function _copiarCanvas(canvasId, btn, label) {
+        document.getElementById(canvasId).toBlob(async (blob) => {
+            try {
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                btn.textContent = '✓ Copiado';
+                setTimeout(() => { btn.textContent = label; }, 2000);
+            } catch (e) {
+                alert('No se pudo copiar. Verificá que el sitio tiene permisos de portapapeles.');
+            }
+        });
+    }
+
+    // Helper: capture an HTML element via html2canvas and copy to clipboard
+    async function _copiarElemento(elId, btn, label) {
+        try {
+            const el = document.getElementById(elId);
+            const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+            canvas.toBlob(async (blob) => {
+                try {
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                    btn.textContent = '✓ Copiado';
+                    setTimeout(() => { btn.textContent = label; }, 2000);
+                } catch (e) {
+                    alert('No se pudo copiar. Verificá que el sitio tiene permisos de portapapeles.');
+                }
+            });
+        } catch (e) {
+            alert('No se pudo copiar. Verificá que el sitio tiene permisos de portapapeles.');
+        }
+    }
+
+    document.getElementById('btnCopiarGrafico').addEventListener('click', (e) => {
+        _copiarCanvas('trendChart', e.currentTarget, 'Copiar gráfico');
+    });
+    document.getElementById('btnCopiarDonutTipo').addEventListener('click', (e) => {
+        _copiarCanvas('donutTipoChart', e.currentTarget, 'Copiar gráfico');
+    });
+    document.getElementById('btnCopiarDonutStatus').addEventListener('click', (e) => {
+        _copiarCanvas('donutStatusChart', e.currentTarget, 'Copiar gráfico');
+    });
+    document.getElementById('btnCopiarMotivos').addEventListener('click', (e) => {
+        _copiarElemento('topMotivosContainer', e.currentTarget, 'Copiar tabla');
+    });
 });

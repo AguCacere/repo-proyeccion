@@ -921,3 +921,21 @@ body { background-color: #f8f9fa; }
     0%   { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
+
+.btn-copiar {
+    background: transparent;
+    border: 0.5px solid #D1D5DB;
+    border-radius: 6px;
+    padding: 3px 9px;
+    font-size: 0.75rem;
+    color: #6B7280;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.btn-copiar:hover {
+    color: #111827;
+    border-color: #9CA3AF;
+}

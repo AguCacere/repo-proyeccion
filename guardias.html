@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guardias — Proyección Mensual</title>
+    <link rel="stylesheet" href="css/style.css?v=6">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { background-color: #f8f9fa; }
+
+        .page-content {
+            padding: 40px 40px 60px;
+        }
+
+        /* ── Header ── */
+        .page-header {
+            margin-bottom: 32px;
+        }
+        .page-header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+        .page-header p {
+            font-size: 0.875rem;
+            color: #6B7280;
+        }
+
+        /* ── Upload grid ── */
+        .upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 700px) {
+            .upload-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ── Upload card ── */
+        .upload-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid #f0f0f0;
+        }
+
+        .upload-card-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #9CA3AF;
+            margin-bottom: 12px;
+        }
+
+        .upload-card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .upload-card-hint {
+            font-size: 0.8rem;
+            color: #6B7280;
+            margin-bottom: 16px;
+        }
+
+        .upload-file-area {
+            border: 2px dashed #E5E7EB;
+            border-radius: 10px;
+            padding: 20px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 200ms, background 200ms;
+            position: relative;
+        }
+
+        .upload-file-area:hover,
+        .upload-file-area.dragover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .upload-file-area input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .upload-file-icon {
+            width: 36px;
+            height: 36px;
+            background: #f3f4f6;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            color: #6B7280;
+        }
+
+        .upload-file-text {
+            font-size: 0.82rem;
+            color: #6B7280;
+        }
+
+        .upload-file-text strong {
+            color: #3b82f6;
+        }
+
+        .upload-file-ext {
+            font-size: 0.72rem;
+            color: #9CA3AF;
+            margin-top: 4px;
+        }
+
+        .upload-status {
+            margin-top: 12px;
+            font-size: 0.82rem;
+            color: #16a34a;
+            font-weight: 500;
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .upload-status.visible {
+            display: flex;
+        }
+
+        .upload-status svg {
+            flex-shrink: 0;
+        }
+
+        /* ── Generate button ── */
+        .btn-generar {
+            width: 100%;
+            padding: 14px;
+            background: #3b82f6;
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 32px;
+            transition: background 200ms, transform 200ms, box-shadow 200ms;
+        }
+
+        .btn-generar:hover:not(:disabled) {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(59,130,246,0.35);
+        }
+
+        .btn-generar:disabled {
+            background: #D1D5DB;
+            color: #9CA3AF;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* ── Results panel ── */
+        .results-panel {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid #f0f0f0;
+            overflow: hidden;
+        }
+
+        .results-panel-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .results-panel-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .panel-hicon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .ph-blue { background: #eff6ff; color: #3b82f6; }
+
+        .results-panel-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .results-panel-sub {
+            font-size: 0.78rem;
+            color: #6B7280;
+            margin-top: 1px;
+        }
+
+        /* ── Table wrapper ── */
+        .table-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .cc-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+
+        .cc-table thead th {
+            background: #f9fafb;
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6B7280;
+            border-bottom: 1px solid #E5E7EB;
+            white-space: nowrap;
+        }
+
+        .cc-table tbody tr {
+            border-bottom: 1px solid #f3f4f6;
+            transition: background 150ms;
+        }
+
+        .cc-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .cc-table tbody tr:hover {
+            background: #f9fafb;
+        }
+
+        .cc-table tbody td {
+            padding: 10px 14px;
+            color: #374151;
+            white-space: nowrap;
+        }
+
+        /* Row states */
+        .cc-table tbody tr.row-error {
+            background: #FEF2F2;
+        }
+        .cc-table tbody tr.row-error:hover {
+            background: #fee2e2;
+        }
+
+        .cc-table tbody tr.row-missing {
+            background: #f9fafb;
+            color: #9CA3AF;
+        }
+        .cc-table tbody tr.row-missing:hover {
+            background: #f3f4f6;
+        }
+
+        /* Cell states */
+        .cell-error {
+            color: #dc2626;
+            font-weight: 600;
+        }
+
+        .cell-increment-pos {
+            color: #dc2626;
+            font-weight: 600;
+        }
+
+        .cell-increment-neg {
+            color: #16a34a;
+            font-weight: 600;
+        }
+
+        .badge-missing {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            background: #f3f4f6;
+            color: #9CA3AF;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+        }
+
+        /* Empty state */
+        .empty-state-cc {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 64px 24px;
+            color: #9CA3AF;
+            gap: 12px;
+            text-align: center;
+        }
+
+        .empty-state-cc svg {
+            opacity: 0.4;
+        }
+
+        .empty-state-cc p {
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="logo">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+            </svg>
+            <span>Proyección v1</span>
+        </div>
+        <nav>
+            <div class="nav-section-label">Menú</div>
+            <ul class="nav-menu">
+                <li class="nav-item" onclick="location.href='home.html'">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <span>Inicio</span>
+                </li>
+                <li class="nav-item" onclick="location.href='index.html'">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    <span>Dashboard</span>
+                </li>
+                <li class="nav-item" onclick="location.href='monitoreo.html'">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <span>Monitoreo</span>
+                </li>
+                <li class="nav-item active" onclick="location.href='guardias.html'">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span>Guardias</span>
+                </li>
+                <li class="nav-item" onclick="alert('Configuración en desarrollo')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>Configuración</span>
+                </li>
+            </ul>
+        </nav>
+        <div class="nav-footer">
+            <span class="nav-footer-version">v1.0</span>
+            <div class="nav-footer-status">
+                <span class="nav-footer-dot"></span>
+                <span>Online</span>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-content">
+
+            <!-- Header -->
+            <div class="page-header">
+                <h1>Guardias</h1>
+                <p id="pageSubtitle">Cargá los archivos para comenzar</p>
+            </div>
+
+            <!-- Upload cards -->
+            <div class="upload-grid">
+
+                <!-- Card 1: Comparativo Excel -->
+                <div class="upload-card">
+                    <div class="upload-card-label">Archivo Comparativo</div>
+                    <div class="upload-card-title">Comparativo Excel</div>
+                    <div class="upload-card-hint">Seleccioná el Excel comparativo — solapa CaminoCritico</div>
+                    <div class="upload-file-area" id="areaComparativo">
+                        <input type="file" id="inputComparativo" accept=".xlsx,.xls" />
+                        <div class="upload-file-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        </div>
+                        <div class="upload-file-text"><strong>Elegir archivo</strong> o arrastrar acá</div>
+                        <div class="upload-file-ext">.xlsx · .xls</div>
+                    </div>
+                    <div class="upload-status" id="statusComparativo">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span id="statusComparativoText"></span>
+                    </div>
+                </div>
+
+                <!-- Card 2: Bitácora ProBatch CSV -->
+                <div class="upload-card">
+                    <div class="upload-card-label">Consulta Log Operaciones</div>
+                    <div class="upload-card-title">Bitácora ProBatch</div>
+                    <div class="upload-card-hint">Seleccioná el CSV exportado de ProBatch</div>
+                    <div class="upload-file-area" id="areaProbatch">
+                        <input type="file" id="inputProbatch" accept=".csv" />
+                        <div class="upload-file-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        </div>
+                        <div class="upload-file-text"><strong>Elegir archivo</strong> o arrastrar acá</div>
+                        <div class="upload-file-ext">.csv</div>
+                    </div>
+                    <div class="upload-status" id="statusProbatch">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span id="statusProbatchText"></span>
+                    </div>
+                </div>
+
+            </div><!-- /.upload-grid -->
+
+            <!-- Generate button -->
+            <button class="btn-generar" id="btnGenerar" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Generar camino crítico
+            </button>
+
+            <!-- Results table -->
+            <div id="resultsContainer"></div>
+
+        </div><!-- /.page-content -->
+    </main>
+
+    <script>
+    // ─────────────────────────────────────────────
+    //  State
+    // ─────────────────────────────────────────────
+    let parsedComparativo = null;
+    let parsedProbatch    = null;
+
+    // ─────────────────────────────────────────────
+    //  Utility — parse duración HH:MM:SS → minutes
+    // ─────────────────────────────────────────────
+    function parseDuracion(str) {
+        if (!str) return null;
+        const s = typeof str === 'string' ? str : String(str);
+        const parts = s.split(':').map(Number);
+        if (parts.length === 3) return parts[0] * 60 + parts[1] + parts[2] / 60;
+        if (parts.length === 2) return parts[0] * 60 + parts[1];
+        return null;
+    }
+
+    function minToHHMM(min) {
+        if (min === null || min === undefined) return '—';
+        const sign = min < 0 ? '-' : '';
+        const abs  = Math.abs(min);
+        const h = Math.floor(abs / 60).toString().padStart(2, '0');
+        const m = Math.floor(abs % 60).toString().padStart(2, '0');
+        return `${sign}${h}:${m}`;
+    }
+
+    function formatDateTime(val) {
+        if (!val) return '—';
+        try {
+            const d = new Date(val);
+            if (isNaN(d)) return String(val);
+            const pad = n => String(n).padStart(2, '0');
+            return `${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        } catch { return String(val); }
+    }
+
+    // ─────────────────────────────────────────────
+    //  Parser 1 — Comparativo Excel
+    // ─────────────────────────────────────────────
+    function parseComparativo(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('Error al leer el archivo Excel.'));
+            reader.onload = (e) => {
+                try {
+                    const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+
+                    // Find sheet whose name contains "caminocritico" (case-insensitive, ignore spaces)
+                    const sheetName = wb.SheetNames.find(n =>
+                        n.toLowerCase().replace(/\s/g, '').includes('caminocritico')
+                    );
+                    if (!sheetName) {
+                        return reject(new Error('No se encontró la solapa CaminoCritico en el Excel.'));
+                    }
+
+                    const ws   = wb.Sheets[sheetName];
+                    const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+                    // Find row that has "Instancia" in column A
+                    const headerRow = data.findIndex(r =>
+                        String(r[0]).toLowerCase().includes('instancia')
+                    );
+                    if (headerRow === -1) {
+                        return reject(new Error('No se encontró la fila de encabezado con "Instancia".'));
+                    }
+
+                    // Cols: Instancia(0), Lote(1), Proceso(2), SQR(3),
+                    //       FechaInicio(4), FechaFin(5), Duracion(6)
+                    const rows = data
+                        .slice(headerRow + 1)
+                        .filter(r => r[0] && r[2]);
+
+                    resolve(rows.map(r => ({
+                        instancia:     r[0],
+                        lote:          r[1],
+                        proceso:       String(r[2]).trim(),
+                        sqr:           r[3],
+                        fechaInicioRef: r[4],
+                        fechaFinRef:    r[5],
+                        duracionRef:    r[6]
+                    })));
+                } catch (err) {
+                    reject(err);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    // ─────────────────────────────────────────────
+    //  Parser 2 — Bitácora ProBatch CSV
+    // ─────────────────────────────────────────────
+    function parseProBatch(file) {
+        return new Promise((resolve, reject) => {
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    resolve(results.data.map(r => ({
+                        comandoCodigo: String(r['Comando Codigo'] || r['ComandoCodigo'] || '').trim(),
+                        fechaInicio:   r['Fecha Inicio'],
+                        fechaFin:      r['Fecha Fin'],
+                        duracion:      r['Duracion'],
+                        estado:        r['Estado']
+                    })));
+                },
+                error: (err) => reject(new Error('Error al leer el CSV: ' + err.message))
+            });
+        });
+    }
+
+    // ─────────────────────────────────────────────
+    //  Cross-reference logic
+    // ─────────────────────────────────────────────
+    function generarCaminoCritico(comparativo, probatch) {
+        // Build index: comandoCodigo → [ rows ]
+        const probatchMap = {};
+        probatch.forEach(r => {
+            if (!probatchMap[r.comandoCodigo]) probatchMap[r.comandoCodigo] = [];
+            probatchMap[r.comandoCodigo].push(r);
+        });
+
+        const rows = comparativo.map((ref) => {
+            const matches = probatchMap[ref.proceso] || [];
+
+            // If multiple rows match, take the one with the latest Fecha Fin
+            const real = matches
+                .slice()
+                .sort((a, b) => new Date(b.fechaFin) - new Date(a.fechaFin))[0] || null;
+
+            const duracionRefMin  = parseDuracion(ref.duracionRef);
+            const duracionRealMin = real ? parseDuracion(real.duracion) : null;
+            const fechaInicioReal = real ? new Date(real.fechaInicio) : null;
+
+            // Debería finalizar = Inicio real + Duración referencia
+            const deberiaFinalizar =
+                fechaInicioReal && duracionRefMin !== null && !isNaN(fechaInicioReal)
+                    ? new Date(fechaInicioReal.getTime() + duracionRefMin * 60000)
+                    : null;
+
+            // Incremento = Duración real − Duración referencia (in minutes)
+            const incremento =
+                duracionRealMin !== null && duracionRefMin !== null
+                    ? duracionRealMin - duracionRefMin
+                    : null;
+
+            return {
+                instancia:     ref.instancia,
+                lote:          ref.lote,
+                proceso:       ref.proceso,
+                sqr:           ref.sqr,
+                duracionRef:   ref.duracionRef,
+                fechaInicioReal: real?.fechaInicio || null,
+                fechaFinReal:    real?.fechaFin    || null,
+                duracionReal:    real?.duracion    || null,
+                estado:          real?.estado      || '—',
+                deberiaFinalizar,
+                incremento,
+                encontrado: !!real
+            };
+        });
+
+        // Calculate Wait: inicio siguiente − fin actual (minutes)
+        return rows.map((row, i, arr) => {
+            const siguiente      = arr[i + 1];
+            const finActual      = row.fechaFinReal    ? new Date(row.fechaFinReal)          : null;
+            const inicioSiguiente = siguiente?.fechaInicioReal
+                ? new Date(siguiente.fechaInicioReal) : null;
+
+            const waitMin =
+                finActual && inicioSiguiente && !isNaN(finActual) && !isNaN(inicioSiguiente)
+                    ? (inicioSiguiente - finActual) / 60000
+                    : null;
+
+            return { ...row, wait: waitMin };
+        });
+    }
+
+    // ─────────────────────────────────────────────
+    //  Render table
+    // ─────────────────────────────────────────────
+    function renderTabla(rows) {
+        const container = document.getElementById('resultsContainer');
+
+        const html = `
+        <div class="results-panel">
+            <div class="results-panel-header">
+                <div class="results-panel-header-left">
+                    <div class="panel-hicon ph-blue">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
+                    <div>
+                        <div class="results-panel-title">Camino Crítico</div>
+                        <div class="results-panel-sub">${rows.length} procesos · ${rows.filter(r => r.encontrado).length} con datos reales · ${rows.filter(r => !r.encontrado).length} sin datos</div>
+                    </div>
+                </div>
+            </div>
+            <div class="table-scroll">
+                <table class="cc-table">
+                    <thead>
+                        <tr>
+                            <th>Inst.</th>
+                            <th>Lote</th>
+                            <th>Proceso</th>
+                            <th>SQR</th>
+                            <th>Dur. Ref.</th>
+                            <th>Inicio Real</th>
+                            <th>Fin Real</th>
+                            <th>Dur. Real</th>
+                            <th>Debería Fin.</th>
+                            <th>Incremento</th>
+                            <th>Wait</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(row => buildRow(row)).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+
+        container.innerHTML = html;
+    }
+
+    function buildRow(row) {
+        const isError   = String(row.estado).toUpperCase() === 'ERROR';
+        const isMissing = !row.encontrado;
+
+        let rowClass = '';
+        if (isError)   rowClass = 'row-error';
+        else if (isMissing) rowClass = 'row-missing';
+
+        // Estado cell
+        const estadoCell = isError
+            ? `<td class="cell-error">${row.estado}</td>`
+            : `<td>${row.estado}</td>`;
+
+        // Proceso cell — badge if no data
+        const procesoCell = isMissing
+            ? `<td>${escHtml(row.proceso)} <span class="badge-missing">Sin datos</span></td>`
+            : `<td>${escHtml(row.proceso)}</td>`;
+
+        // Incremento cell
+        let incrementoCell = '<td>—</td>';
+        if (row.incremento !== null) {
+            const val = minToHHMM(row.incremento);
+            if (row.incremento > 0) {
+                incrementoCell = `<td class="cell-increment-pos">+${val}</td>`;
+            } else if (row.incremento < 0) {
+                incrementoCell = `<td class="cell-increment-neg">${val}</td>`;
+            } else {
+                incrementoCell = `<td>${val}</td>`;
+            }
+        }
+
+        return `
+        <tr class="${rowClass}">
+            <td>${escHtml(String(row.instancia ?? '—'))}</td>
+            <td>${escHtml(String(row.lote ?? '—'))}</td>
+            ${procesoCell}
+            <td>${escHtml(String(row.sqr ?? '—'))}</td>
+            <td>${escHtml(String(row.duracionRef ?? '—'))}</td>
+            <td>${formatDateTime(row.fechaInicioReal)}</td>
+            <td>${formatDateTime(row.fechaFinReal)}</td>
+            <td>${escHtml(String(row.duracionReal ?? '—'))}</td>
+            <td>${formatDateTime(row.deberiaFinalizar)}</td>
+            ${incrementoCell}
+            <td>${minToHHMM(row.wait)}</td>
+            ${estadoCell}
+        </tr>`;
+    }
+
+    function escHtml(str) {
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // ─────────────────────────────────────────────
+    //  File input handlers
+    // ─────────────────────────────────────────────
+    function updateButton() {
+        document.getElementById('btnGenerar').disabled =
+            !(parsedComparativo && parsedProbatch);
+    }
+
+    function updateSubtitle() {
+        const now = new Date();
+        const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('pageSubtitle').textContent =
+            now.toLocaleDateString('es-AR', opts);
+    }
+
+    document.getElementById('inputComparativo').addEventListener('change', async function () {
+        const file = this.files[0];
+        if (!file) return;
+        try {
+            parsedComparativo = await parseComparativo(file);
+            const sqrCount = parsedComparativo.filter(r => r.sqr).length;
+            document.getElementById('statusComparativoText').textContent =
+                `${file.name} — ${parsedComparativo.length} procesos, ${sqrCount} SQR encontrados`;
+            document.getElementById('statusComparativo').classList.add('visible');
+            updateSubtitle();
+        } catch (err) {
+            parsedComparativo = null;
+            document.getElementById('statusComparativoText').textContent = '⚠ ' + err.message;
+            document.getElementById('statusComparativo').style.color = '#dc2626';
+            document.getElementById('statusComparativo').classList.add('visible');
+        }
+        updateButton();
+    });
+
+    document.getElementById('inputProbatch').addEventListener('change', async function () {
+        const file = this.files[0];
+        if (!file) return;
+        try {
+            parsedProbatch = await parseProBatch(file);
+            document.getElementById('statusProbatchText').textContent =
+                `${file.name} — ${parsedProbatch.length} registros`;
+            document.getElementById('statusProbatch').classList.add('visible');
+            updateSubtitle();
+        } catch (err) {
+            parsedProbatch = null;
+            document.getElementById('statusProbatchText').textContent = '⚠ ' + err.message;
+            document.getElementById('statusProbatch').style.color = '#dc2626';
+            document.getElementById('statusProbatch').classList.add('visible');
+        }
+        updateButton();
+    });
+
+    // ─────────────────────────────────────────────
+    //  Drag & drop visual feedback
+    // ─────────────────────────────────────────────
+    ['areaComparativo', 'areaProbatch'].forEach(id => {
+        const area = document.getElementById(id);
+        area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('dragover'); });
+        area.addEventListener('dragleave', () => area.classList.remove('dragover'));
+        area.addEventListener('drop', () => area.classList.remove('dragover'));
+    });
+
+    // ─────────────────────────────────────────────
+    //  Generate button
+    // ─────────────────────────────────────────────
+    document.getElementById('btnGenerar').addEventListener('click', () => {
+        if (!parsedComparativo || !parsedProbatch) return;
+        const resultado = generarCaminoCritico(parsedComparativo, parsedProbatch);
+        renderTabla(resultado);
+        document.getElementById('resultsContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    </script>
+</body>
+</html>
