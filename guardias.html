@@ -504,7 +504,7 @@
 
                     // Find row that has "Instancia" in column A
                     const headerRow = data.findIndex(r =>
-                        String(r[0]).toLowerCase().includes('instancia')
+                        String(r[0]).trim() === 'I' || String(r[0]).toLowerCase().includes('instancia')
                     );
                     if (headerRow === -1) {
                         return reject(new Error('No se encontró la fila de encabezado con "Instancia".'));
