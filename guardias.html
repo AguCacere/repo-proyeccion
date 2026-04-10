@@ -324,6 +324,21 @@
             font-weight: 500;
         }
 
+        /* ── On Line cell ── */
+        .cell-online {
+            background: #EFF6FF;
+            color: #1D4ED8;
+            font-weight: 700;
+            border-radius: 4px;
+            padding: 2px 8px;
+            display: inline-block;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+        .cell-online-empty {
+            color: #CBD5E1;
+        }
+
         /* Row states */
         .cc-table tbody tr.row-error {
             background: #FEF2F2;
@@ -569,6 +584,20 @@
         } catch { return String(val); }
     }
 
+    // Format only the HH:MM portion of a date
+    function formatTimeOnly(val) {
+        if (!val) return '—';
+        try {
+            const d = val instanceof Date ? val : new Date(val);
+            if (isNaN(d)) return '—';
+            const pad = n => String(n).padStart(2, '0');
+            if (val instanceof Date && !val._local) {
+                return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+            }
+            return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        } catch { return '—'; }
+    }
+
     // CSV-sourced Date (local time) — flag to use local methods in formatDateTime
     function csvDate(str) {
         if (!str) return null;
@@ -669,6 +698,19 @@
     //  Cross-reference logic
     // ─────────────────────────────────────────────
     function generarCaminoCritico(comparativo, probatch) {
+        // ── Falta Batch: sum of duracionRef from row i to proceso 99011 ──
+        const idx99011 = comparativo.findIndex(r => String(r.proceso).trim() === '99011');
+        const hasta = idx99011 >= 0 ? idx99011 + 1 : comparativo.length;
+        comparativo.forEach((row, i) => {
+            if (i >= hasta) {
+                row.faltaBatch = 0;
+            } else {
+                row.faltaBatch = comparativo
+                    .slice(i, hasta)
+                    .reduce((acc, r) => acc + (parseDuracion(r.duracionRef) || 0), 0);
+            }
+        });
+
         // Build index: comandoCodigo → [ rows ]
         const probatchMap = {};
         probatch.forEach(r => {
@@ -700,16 +742,23 @@
                     ? duracionRealMin - duracionRefMin
                     : null;
 
+            // On Line = Inicio real + Falta Batch
+            const onLineDate = fechaInicioReal && ref.faltaBatch != null
+                ? (() => { const d = new Date(fechaInicioReal.getTime() + ref.faltaBatch * 60000); d._local = true; return d; })()
+                : null;
+
             return {
-                instancia:     ref.instancia,
-                lote:          ref.lote,
-                proceso:       ref.proceso,
-                sqr:           ref.sqr,
-                duracionRef:   ref.duracionRef,
+                instancia:       ref.instancia,
+                lote:            ref.lote,
+                proceso:         ref.proceso,
+                sqr:             ref.sqr,
+                duracionRef:     ref.duracionRef,
+                faltaBatch:      ref.faltaBatch,
                 fechaInicioReal: real?.fechaInicio || null,
                 fechaFinReal:    real?.fechaFin    || null,
                 duracionReal:    real?.duracion    || null,
                 estado:          real?.estado      || '—',
+                onLine:          onLineDate,
                 deberiaFinalizar,
                 incremento,
                 encontrado: !!real
@@ -760,7 +809,9 @@
                             <th>Proceso</th>
                             <th>SQR</th>
                             <th>Inicio Real</th>
+                            <th>On Line</th>
                             <th>Fin Real</th>
+                            <th>Dur. Ref.</th>
                             <th>Dur. Real</th>
                             <th>Incremento</th>
                             <th>Estado</th>
@@ -807,6 +858,11 @@
             ? escHtml(String(row.duracionRef))
             : '—';
 
+        // On Line cell
+        const onLineCell = row.onLine
+            ? `<td><span class="cell-online">${formatTimeOnly(row.onLine)}</span></td>`
+            : `<td><span class="cell-online-empty">—</span></td>`;
+
         const mainRow = `
         <tr class="cc-main-row ${rowStateClass}" onclick="toggleDetail(${idx})">
             <td class="cc-expand-cell">
@@ -817,7 +873,9 @@
             ${procesoCell}
             <td>${escHtml(String(row.sqr ?? '—'))}</td>
             <td>${formatDateTime(row.fechaInicioReal)}</td>
+            ${onLineCell}
             <td>${formatDateTime(row.fechaFinReal)}</td>
+            <td>${durRefDisplay}</td>
             <td>${escHtml(String(row.duracionReal ?? '—'))}</td>
             ${incrementoCell}
             ${estadoCell}
@@ -825,11 +883,11 @@
 
         const detailRow = `
         <tr class="cc-detail-row" id="detail-${idx}">
-            <td colspan="10">
+            <td colspan="12">
                 <div class="cc-detail-grid">
                     <div class="cc-detail-item">
-                        <span class="cc-detail-label">Dur. Ref.</span>
-                        <span class="cc-detail-value">${durRefDisplay}</span>
+                        <span class="cc-detail-label">Falta Batch</span>
+                        <span class="cc-detail-value">${minToHHMM(row.faltaBatch)}</span>
                     </div>
                     <div class="cc-detail-item">
                         <span class="cc-detail-label">Debería Fin.</span>
