@@ -230,44 +230,98 @@
         .table-scroll {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
+            border-radius: 0 0 12px 12px;
         }
 
         .cc-table {
             width: 100%;
+            min-width: 900px;
             border-collapse: collapse;
-            font-size: 0.82rem;
+            font-size: 13px;
         }
 
         .cc-table thead th {
-            background: #f9fafb;
-            padding: 10px 14px;
+            position: sticky;
+            top: 0;
+            background: #ffffff;
+            padding: 10px 12px;
             text-align: left;
-            font-size: 0.7rem;
+            font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #6B7280;
-            border-bottom: 1px solid #E5E7EB;
+            letter-spacing: 0.04em;
+            color: #94A3B8;
+            border-bottom: 1px solid #E2E8F0;
             white-space: nowrap;
+            z-index: 1;
         }
 
-        .cc-table tbody tr {
-            border-bottom: 1px solid #f3f4f6;
-            transition: background 150ms;
+        .cc-table tbody tr.cc-main-row {
+            border-bottom: 1px solid #F1F5F9;
+            transition: background 120ms;
+            cursor: pointer;
         }
 
-        .cc-table tbody tr:last-child {
-            border-bottom: none;
-        }
-
-        .cc-table tbody tr:hover {
-            background: #f9fafb;
+        .cc-table tbody tr.cc-main-row:hover {
+            background: #f8faff;
         }
 
         .cc-table tbody td {
-            padding: 10px 14px;
+            padding: 8px 12px;
             color: #374151;
             white-space: nowrap;
+        }
+
+        /* Expand toggle chevron */
+        .cc-expand-cell {
+            width: 28px;
+            color: #CBD5E1;
+            transition: color 150ms;
+        }
+        .cc-main-row:hover .cc-expand-cell { color: #94A3B8; }
+        .cc-main-row.expanded .cc-expand-cell { color: #3b82f6; }
+
+        .cc-chevron {
+            display: block;
+            transition: transform 200ms;
+        }
+        .cc-main-row.expanded .cc-chevron {
+            transform: rotate(90deg);
+        }
+
+        /* Detail / secondary row */
+        .cc-detail-row {
+            display: none;
+            background: #f8faff;
+        }
+        .cc-detail-row.visible {
+            display: table-row;
+        }
+        .cc-detail-row td {
+            padding: 6px 12px 10px 40px;
+            border-bottom: 1px solid #E2E8F0;
+        }
+        .cc-detail-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .cc-detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .cc-detail-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94A3B8;
+        }
+        .cc-detail-value {
+            font-size: 12px;
+            color: #374151;
+            font-weight: 500;
         }
 
         /* Row states */
@@ -452,9 +506,40 @@
     // ─────────────────────────────────────────────
     //  Utility — parse duración HH:MM:SS → minutes
     // ─────────────────────────────────────────────
-    function parseDuracion(str) {
-        if (!str) return null;
-        const s = typeof str === 'string' ? str : String(str);
+    // ── Excel serial → JS Date (UTC) ──────────────────────────────────────
+    function excelSerialToDate(serial) {
+        if (!serial) return null;
+        if (typeof serial === 'string' && serial.includes(':')) return serial;
+        const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+        return date;
+    }
+
+    // Display HH:MM from a UTC-based Date (XLSX-sourced)
+    function formatHHMM(date) {
+        if (!date) return '—';
+        const h = String(date.getUTCHours()).padStart(2, '0');
+        const m = String(date.getUTCMinutes()).padStart(2, '0');
+        return `${h}:${m}`;
+    }
+
+    // Convert Excel time fraction (or string) to HH:MM:SS string for parseDuracion
+    function excelDurToStr(val) {
+        if (!val) return null;
+        if (typeof val === 'string') return val;
+        if (val instanceof Date) return formatHHMM(val) + ':00';
+        const totalSecs = Math.round(val * 86400);
+        const h = Math.floor(totalSecs / 3600);
+        const m = Math.floor((totalSecs % 3600) / 60);
+        const s = totalSecs % 60;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    function parseDuracion(val) {
+        if (!val) return null;
+        if (val instanceof Date) {
+            return val.getUTCHours() * 60 + val.getUTCMinutes() + val.getUTCSeconds() / 60;
+        }
+        const s = typeof val === 'string' ? val : String(val);
         const parts = s.split(':').map(Number);
         if (parts.length === 3) return parts[0] * 60 + parts[1] + parts[2] / 60;
         if (parts.length === 2) return parts[0] * 60 + parts[1];
@@ -473,11 +558,24 @@
     function formatDateTime(val) {
         if (!val) return '—';
         try {
-            const d = new Date(val);
+            const d = val instanceof Date ? val : new Date(val);
             if (isNaN(d)) return String(val);
             const pad = n => String(n).padStart(2, '0');
+            // XLSX-sourced Dates were built via UTC arithmetic — read UTC
+            if (val instanceof Date && !(val._local)) {
+                return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+            }
             return `${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         } catch { return String(val); }
+    }
+
+    // CSV-sourced Date (local time) — flag to use local methods in formatDateTime
+    function csvDate(str) {
+        if (!str) return null;
+        const d = new Date(str);
+        if (isNaN(d)) return null;
+        d._local = true;
+        return d;
     }
 
     // ─────────────────────────────────────────────
@@ -489,7 +587,7 @@
             reader.onerror = () => reject(new Error('Error al leer el archivo Excel.'));
             reader.onload = (e) => {
                 try {
-                    const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+                    const wb = XLSX.read(e.target.result, { type: 'array', cellDates: false });
 
                     // Find sheet whose name contains "caminocritico" (case-insensitive, ignore spaces)
                     const sheetName = wb.SheetNames.find(n =>
@@ -533,9 +631,9 @@
                         lote:           r[colLote],
                         proceso:        String(r[colProceso]).trim(),
                         sqr:            r[colSQR],
-                        fechaInicioRef: r[colFechaInicio],
-                        fechaFinRef:    r[colFechaFin],
-                        duracionRef:    r[colDuracion]
+                        fechaInicioRef: excelSerialToDate(r[colFechaInicio]),
+                        fechaFinRef:    excelSerialToDate(r[colFechaFin]),
+                        duracionRef:    excelDurToStr(r[colDuracion])
                     })));
                 } catch (err) {
                     reject(err);
@@ -588,7 +686,7 @@
 
             const duracionRefMin  = parseDuracion(ref.duracionRef);
             const duracionRealMin = real ? parseDuracion(real.duracion) : null;
-            const fechaInicioReal = real ? new Date(real.fechaInicio) : null;
+            const fechaInicioReal = real ? csvDate(real.fechaInicio) : null;
 
             // Debería finalizar = Inicio real + Duración referencia
             const deberiaFinalizar =
@@ -621,9 +719,8 @@
         // Calculate Wait: inicio siguiente − fin actual (minutes)
         return rows.map((row, i, arr) => {
             const siguiente      = arr[i + 1];
-            const finActual      = row.fechaFinReal    ? new Date(row.fechaFinReal)          : null;
-            const inicioSiguiente = siguiente?.fechaInicioReal
-                ? new Date(siguiente.fechaInicioReal) : null;
+            const finActual       = row.fechaFinReal            ? csvDate(row.fechaFinReal)            : null;
+            const inicioSiguiente = siguiente?.fechaInicioReal ? csvDate(siguiente.fechaInicioReal) : null;
 
             const waitMin =
                 finActual && inicioSiguiente && !isNaN(finActual) && !isNaN(inicioSiguiente)
@@ -649,7 +746,7 @@
                     </div>
                     <div>
                         <div class="results-panel-title">Camino Crítico</div>
-                        <div class="results-panel-sub">${rows.length} procesos · ${rows.filter(r => r.encontrado).length} con datos reales · ${rows.filter(r => !r.encontrado).length} sin datos</div>
+                        <div class="results-panel-sub">${rows.length} procesos · ${rows.filter(r => r.encontrado).length} con datos reales · ${rows.filter(r => !r.encontrado).length} sin datos · Clic en fila para ver detalle</div>
                     </div>
                 </div>
             </div>
@@ -657,22 +754,20 @@
                 <table class="cc-table">
                     <thead>
                         <tr>
+                            <th></th>
                             <th>Inst.</th>
                             <th>Lote</th>
                             <th>Proceso</th>
                             <th>SQR</th>
-                            <th>Dur. Ref.</th>
                             <th>Inicio Real</th>
                             <th>Fin Real</th>
                             <th>Dur. Real</th>
-                            <th>Debería Fin.</th>
                             <th>Incremento</th>
-                            <th>Wait</th>
                             <th>Estado</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${rows.map(row => buildRow(row)).join('')}
+                        ${rows.map((row, i) => buildRow(row, i)).join('')}
                     </tbody>
                 </table>
             </div>
@@ -681,18 +776,18 @@
         container.innerHTML = html;
     }
 
-    function buildRow(row) {
+    function buildRow(row, idx) {
         const isError   = String(row.estado).toUpperCase() === 'ERROR';
         const isMissing = !row.encontrado;
 
-        let rowClass = '';
-        if (isError)   rowClass = 'row-error';
-        else if (isMissing) rowClass = 'row-missing';
+        let rowStateClass = '';
+        if (isError)        rowStateClass = 'row-error';
+        else if (isMissing) rowStateClass = 'row-missing';
 
         // Estado cell
         const estadoCell = isError
-            ? `<td class="cell-error">${row.estado}</td>`
-            : `<td>${row.estado}</td>`;
+            ? `<td class="cell-error">${escHtml(row.estado)}</td>`
+            : `<td>${escHtml(row.estado)}</td>`;
 
         // Proceso cell — badge if no data
         const procesoCell = isMissing
@@ -703,30 +798,61 @@
         let incrementoCell = '<td>—</td>';
         if (row.incremento !== null) {
             const val = minToHHMM(row.incremento);
-            if (row.incremento > 0) {
-                incrementoCell = `<td class="cell-increment-pos">+${val}</td>`;
-            } else if (row.incremento < 0) {
-                incrementoCell = `<td class="cell-increment-neg">${val}</td>`;
-            } else {
-                incrementoCell = `<td>${val}</td>`;
-            }
+            if (row.incremento > 0)      incrementoCell = `<td class="cell-increment-pos">+${val}</td>`;
+            else if (row.incremento < 0) incrementoCell = `<td class="cell-increment-neg">${val}</td>`;
+            else                          incrementoCell = `<td>${val}</td>`;
         }
 
-        return `
-        <tr class="${rowClass}">
+        const durRefDisplay = row.duracionRef
+            ? escHtml(String(row.duracionRef))
+            : '—';
+
+        const mainRow = `
+        <tr class="cc-main-row ${rowStateClass}" onclick="toggleDetail(${idx})">
+            <td class="cc-expand-cell">
+                <svg class="cc-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </td>
             <td>${escHtml(String(row.instancia ?? '—'))}</td>
             <td>${escHtml(String(row.lote ?? '—'))}</td>
             ${procesoCell}
             <td>${escHtml(String(row.sqr ?? '—'))}</td>
-            <td>${escHtml(String(row.duracionRef ?? '—'))}</td>
             <td>${formatDateTime(row.fechaInicioReal)}</td>
             <td>${formatDateTime(row.fechaFinReal)}</td>
             <td>${escHtml(String(row.duracionReal ?? '—'))}</td>
-            <td>${formatDateTime(row.deberiaFinalizar)}</td>
             ${incrementoCell}
-            <td>${minToHHMM(row.wait)}</td>
             ${estadoCell}
         </tr>`;
+
+        const detailRow = `
+        <tr class="cc-detail-row" id="detail-${idx}">
+            <td colspan="10">
+                <div class="cc-detail-grid">
+                    <div class="cc-detail-item">
+                        <span class="cc-detail-label">Dur. Ref.</span>
+                        <span class="cc-detail-value">${durRefDisplay}</span>
+                    </div>
+                    <div class="cc-detail-item">
+                        <span class="cc-detail-label">Debería Fin.</span>
+                        <span class="cc-detail-value">${formatDateTime(row.deberiaFinalizar)}</span>
+                    </div>
+                    <div class="cc-detail-item">
+                        <span class="cc-detail-label">Wait</span>
+                        <span class="cc-detail-value">${minToHHMM(row.wait)}</span>
+                    </div>
+                </div>
+            </td>
+        </tr>`;
+
+        return mainRow + detailRow;
+    }
+
+    function toggleDetail(idx) {
+        const detailRow = document.getElementById(`detail-${idx}`);
+        const mainRow   = detailRow?.previousElementSibling;
+        if (!detailRow) return;
+        const isOpen = detailRow.classList.contains('visible');
+        detailRow.classList.toggle('visible', !isOpen);
+        mainRow?.classList.toggle('expanded', !isOpen);
     }
 
     function escHtml(str) {
