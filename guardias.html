@@ -502,28 +502,40 @@
                     const ws   = wb.Sheets[sheetName];
                     const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-                    // Find row that has "Instancia" in column A
+                    // Find the header row by looking for a row that has I, Lote and Proceso together
                     const headerRow = data.findIndex(r =>
-                        String(r[0]).trim() === 'I' || String(r[0]).toLowerCase().includes('instancia')
+                        r.some(cell => String(cell).trim() === 'I') &&
+                        r.some(cell => String(cell).trim() === 'Lote') &&
+                        r.some(cell => String(cell).trim() === 'Proceso')
                     );
                     if (headerRow === -1) {
-                        return reject(new Error('No se encontró la fila de encabezado con "Instancia".'));
+                        return reject(new Error('No se encontró la fila de encabezado con "I", "Lote" y "Proceso".'));
                     }
 
-                    // Cols: Instancia(0), Lote(1), Proceso(2), SQR(3),
-                    //       FechaInicio(4), FechaFin(5), Duracion(6)
+                    // Resolve column positions dynamically — safe against leading/extra columns
+                    const headers = data[headerRow];
+                    const colI          = headers.findIndex(h => String(h).trim() === 'I');
+                    const colLote       = headers.findIndex(h => String(h).trim() === 'Lote');
+                    const colProceso    = headers.findIndex(h => String(h).trim() === 'Proceso');
+                    const colSQR        = headers.findIndex(h => String(h).trim() === 'SQR');
+                    const colFechaInicio = headers.findIndex(h => String(h).trim() === 'Fecha Inicio');
+                    const colFechaFin   = headers.findIndex(h => String(h).trim() === 'Fecha Fin');
+                    const colDuracion   = headers.findIndex(h =>
+                        String(h).trim() === 'Duración' || String(h).trim() === 'Duracion'
+                    );
+
                     const rows = data
                         .slice(headerRow + 1)
-                        .filter(r => r[0] && r[2]);
+                        .filter(r => r[colI] && r[colProceso]);
 
                     resolve(rows.map(r => ({
-                        instancia:     r[0],
-                        lote:          r[1],
-                        proceso:       String(r[2]).trim(),
-                        sqr:           r[3],
-                        fechaInicioRef: r[4],
-                        fechaFinRef:    r[5],
-                        duracionRef:    r[6]
+                        instancia:      r[colI],
+                        lote:           r[colLote],
+                        proceso:        String(r[colProceso]).trim(),
+                        sqr:            r[colSQR],
+                        fechaInicioRef: r[colFechaInicio],
+                        fechaFinRef:    r[colFechaFin],
+                        duracionRef:    r[colDuracion]
                     })));
                 } catch (err) {
                     reject(err);
