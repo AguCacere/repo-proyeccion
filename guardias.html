@@ -493,22 +493,21 @@
         /* ── Gantt modal ── */
         .gantt-overlay {
             position: fixed;
-            inset: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.5);
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            z-index: 999;
             opacity: 0;
             transition: opacity 200ms;
             pointer-events: none;
         }
-        .gantt-overlay.open {
-            opacity: 1;
-            pointer-events: all;
-        }
+        .gantt-overlay.open { opacity: 1; pointer-events: all; }
         .gantt-panel {
-            width: 95vw;
+            position: fixed;
+            top: 5vh;
+            left: 220px;
+            right: 0;
+            margin: 0 auto;
+            width: calc(100vw - 260px);
             max-height: 90vh;
             background: #fff;
             border-radius: 16px;
@@ -516,6 +515,7 @@
             flex-direction: column;
             overflow: hidden;
             box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            z-index: 1000;
             transform: translateY(12px);
             transition: transform 200ms;
         }
@@ -699,8 +699,14 @@
                     <span><span style="background:#10B981;width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>OK</span>
                     <span><span style="background:#F59E0B;width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Demorado</span>
                     <span><span style="background:#EF4444;width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Error</span>
-                    <span><span style="background:rgba(148,163,184,0.4);width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Proyección</span>
+                    <span><span style="background:rgba(148,163,184,0.35);width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Proyección</span>
                     <span><span style="background:#3B82F6;width:2px;height:12px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Ahora</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px 0;border-top:0.5px solid #E2E8F0;border-bottom:0.5px solid #E2E8F0;">
+                    <button id="btnGanttAnterior" style="padding:6px 14px;border:0.5px solid #E2E8F0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-family:inherit;">← Anterior</button>
+                    <span id="ganttLabelVentana" style="flex:1;text-align:center;font-size:14px;font-weight:500;color:#374151;"></span>
+                    <button id="btnGanttSiguiente" style="padding:6px 14px;border:0.5px solid #E2E8F0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-family:inherit;">Siguiente →</button>
+                    <button id="btnGanttAhora" style="padding:6px 14px;border:0.5px solid #3B82F6;border-radius:6px;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-size:12px;font-family:inherit;font-weight:600;">Ir a ahora</button>
                 </div>
                 <div class="gantt-canvas-wrap" id="ganttCanvasWrap">
                     <canvas id="ganttChart"></canvas>
@@ -721,6 +727,8 @@
     let archivoComparativoNombre = null;
     let archivoCsvNombre         = null;
     let currentRows              = null;
+    let ganttOffsetMin           = 0;
+    const VENTANA_MINUTOS        = 60;
 
     const STORAGE_KEY = 'sqr_guardia_sesion';
 
@@ -1200,15 +1208,6 @@
     // ─────────────────────────────────────────────
     //  Gantt helpers
     // ─────────────────────────────────────────────
-    function prepararDatosGantt(filas) {
-        const ejecutados = filas.filter(f => f.fechaInicioReal && f.fechaFinReal);
-        const pendientes = filas.filter(f => !f.fechaInicioReal).slice(0, 10);
-        return [...ejecutados, ...pendientes].map(f => ({
-            ...f,
-            duracionRefMin: parseDuracion(f.duracionRef)
-        }));
-    }
-
     function horaAMinutos(fechaStr) {
         if (!fechaStr) return null;
         const d = new Date(fechaStr);
@@ -1224,54 +1223,86 @@
         return h + ':' + m;
     }
 
+    // Returns rows visible in the current window + next 10 pending
+    function prepararDatosGantt(filas, offsetMin) {
+        const ventanaFin = offsetMin + VENTANA_MINUTOS;
+
+        // Executed rows that overlap [offsetMin, ventanaFin]
+        const ejecutados = filas
+            .filter(f => f.fechaInicioReal && f.fechaFinReal)
+            .filter(f => {
+                const ini = horaAMinutos(f.fechaInicioReal);
+                const fin = horaAMinutos(f.fechaFinReal);
+                return ini !== null && fin !== null && ini < ventanaFin && fin > offsetMin;
+            });
+
+        // Next 10 pending rows immediately after the last executed one
+        let lastExecIdx = -1;
+        filas.forEach((f, i) => { if (f.fechaInicioReal && f.fechaFinReal) lastExecIdx = i; });
+        const pendientes = filas
+            .slice(lastExecIdx + 1)
+            .filter(f => !f.fechaInicioReal)
+            .slice(0, 10);
+
+        return [...ejecutados, ...pendientes].map(f => ({
+            ...f,
+            duracionRefMin: parseDuracion(f.duracionRef)
+        }));
+    }
+
+    function actualizarLabelVentana() {
+        const el = document.getElementById('ganttLabelVentana');
+        if (el) el.textContent =
+            minutosAHora(ganttOffsetMin) + ' — ' + minutosAHora(ganttOffsetMin + VENTANA_MINUTOS);
+    }
+
     function renderGantt(filas) {
-        const datos = prepararDatosGantt(filas);
-        const labels = datos.map(f => f.sqr || f.proceso);
+        const visibles = prepararDatosGantt(filas, ganttOffsetMin);
+        const labels   = visibles.map(f => f.sqr || f.proceso);
 
-        const iniciosMin = datos
-            .filter(f => f.fechaInicioReal)
-            .map(f => horaAMinutos(f.fechaInicioReal));
+        actualizarLabelVentana();
 
-        const minX = iniciosMin.length ? Math.min(...iniciosMin) - 15 : 0;
-        const maxX = minX + 600;
-
-        // Altura dinámica
-        const altura = Math.max(400, datos.length * 36);
+        // Dynamic height: 44px per row + 80px axes padding
+        const altura = Math.max(400, visibles.length * 44 + 80);
         document.getElementById('ganttCanvasWrap').style.height = altura + 'px';
+
+        // "Ahora" line offset relative to window start
+        const ahora = new Date();
+        let ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
+        if (ahora.getHours() < 12) ahoraMin += 24 * 60;
+        const ahoraOffset = ahoraMin - ganttOffsetMin;
 
         const datasets = [
             {
+                // Invisible spacer to push each bar to its start position
                 label: 'offset',
-                data: datos.map(f =>
-                    f.fechaInicioReal ? horaAMinutos(f.fechaInicioReal) - minX : 0
-                ),
+                data: visibles.map(f => {
+                    if (!f.fechaInicioReal) return 0;
+                    return Math.max(0, horaAMinutos(f.fechaInicioReal) - ganttOffsetMin);
+                }),
                 backgroundColor: 'rgba(0,0,0,0)',
                 borderWidth: 0,
-                barPercentage: 0.6
+                barPercentage: 0.65,
+                categoryPercentage: 0.85
             },
             {
                 label: 'duración',
-                data: datos.map(f => {
-                    if (f.fechaInicioReal && f.fechaFinReal) {
-                        return horaAMinutos(f.fechaFinReal) - horaAMinutos(f.fechaInicioReal);
-                    }
-                    return f.duracionRefMin || 1;
+                data: visibles.map(f => {
+                    if (!f.fechaInicioReal) return Math.max(f.duracionRefMin || 2, 3);
+                    const dur = horaAMinutos(f.fechaFinReal) - horaAMinutos(f.fechaInicioReal);
+                    return Math.max(dur, 3);
                 }),
-                backgroundColor: datos.map(f => {
-                    if (!f.fechaInicioReal) return 'rgba(148,163,184,0.4)';
+                backgroundColor: visibles.map(f => {
+                    if (!f.fechaInicioReal) return 'rgba(148,163,184,0.35)';
                     if (String(f.estado).toUpperCase() === 'ERROR') return '#EF4444';
                     if (f.incremento > 0) return '#F59E0B';
                     return '#10B981';
                 }),
-                borderRadius: 3,
-                barPercentage: 0.6
+                borderRadius: 4,
+                barPercentage: 0.65,
+                categoryPercentage: 0.85
             }
         ];
-
-        const ahora = new Date();
-        let ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
-        if (ahora.getHours() < 12) ahoraMin += 24 * 60;
-        const ahoraOffset = ahoraMin - minX;
 
         const ctx = document.getElementById('ganttChart').getContext('2d');
         if (window.ganttInstance) window.ganttInstance.destroy();
@@ -1283,23 +1314,32 @@
                 indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: { padding: { bottom: 30, left: 10, right: 20 } },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
+                        backgroundColor: '#1E293B',
+                        titleColor: '#F8FAFC',
+                        bodyColor: '#CBD5E1',
+                        padding: 10,
+                        cornerRadius: 8,
                         callbacks: {
                             title(items) {
-                                const f = datos[items[0].dataIndex];
+                                const f = visibles[items[0].dataIndex];
                                 return f.sqr || f.proceso;
                             },
                             label(ctx) {
-                                const f = datos[ctx.dataIndex];
                                 if (ctx.datasetIndex === 0) return null;
-                                if (!f.fechaInicioReal) return 'Proyección — Dur. ref: ' + (f.duracionRef || '—');
+                                const f = visibles[ctx.dataIndex];
+                                if (!f.fechaInicioReal) return 'Proyección — ' + (f.duracionRef || '—');
+                                const durMin = horaAMinutos(f.fechaFinReal) - horaAMinutos(f.fechaInicioReal);
                                 return [
-                                    'Inicio: ' + minutosAHora(horaAMinutos(f.fechaInicioReal)),
-                                    'Fin:    ' + minutosAHora(horaAMinutos(f.fechaFinReal)),
-                                    'Estado: ' + f.estado,
-                                    f.incremento > 0 ? 'Incremento: +' + Math.round(f.incremento) + ' min' : ''
+                                    'Inicio: '   + minutosAHora(horaAMinutos(f.fechaInicioReal)),
+                                    'Fin: '      + minutosAHora(horaAMinutos(f.fechaFinReal)),
+                                    'Duración: ' + Math.round(durMin) + ' min',
+                                    'Estado: '   + f.estado,
+                                    f.incremento > 0 ? '▲ +' + Math.round(f.incremento) + ' min vs referencia' :
+                                    f.incremento < 0 ? '▼ '  + Math.round(f.incremento) + ' min vs referencia' : ''
                                 ].filter(Boolean);
                             }
                         }
@@ -1309,12 +1349,12 @@
                     x: {
                         stacked: true,
                         min: 0,
-                        max: maxX - minX,
+                        max: VENTANA_MINUTOS,
                         ticks: {
-                            callback: v => minutosAHora(v + minX),
+                            callback: v => minutosAHora(v + ganttOffsetMin),
                             font: { size: 11 },
                             color: '#94A3B8',
-                            maxTicksLimit: 12
+                            maxTicksLimit: 10
                         },
                         grid: { color: 'rgba(0,0,0,0.04)' },
                         border: { display: false }
@@ -1330,7 +1370,7 @@
             plugins: [{
                 id: 'lineaAhora',
                 afterDraw(chart) {
-                    if (ahoraOffset < 0 || ahoraOffset > (maxX - minX)) return;
+                    if (ahoraOffset < 0 || ahoraOffset > VENTANA_MINUTOS) return;
                     const { ctx, scales: { x: xAxis, y: yAxis } } = chart;
                     const xPx = xAxis.getPixelForValue(ahoraOffset);
                     ctx.save();
@@ -1352,12 +1392,17 @@
 
     function abrirGantt() {
         if (!currentRows) return;
-        const overlay = document.getElementById('ganttOverlay');
+        // Open window ~15 min before current time
+        const ahora = new Date();
+        let ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
+        if (ahora.getHours() < 12) ahoraMin += 24 * 60;
+        ganttOffsetMin = Math.max(0, ahoraMin - 15);
+
         const now = new Date();
         const pad = n => String(n).padStart(2, '0');
         document.getElementById('ganttSubtitle').textContent =
             `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} · ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-        overlay.classList.add('open');
+        document.getElementById('ganttOverlay').classList.add('open');
         renderGantt(currentRows);
     }
 
@@ -1451,7 +1496,7 @@
     });
 
     // ─────────────────────────────────────────────
-    //  Gantt modal — close handlers
+    //  Gantt modal — close + navigation handlers
     // ─────────────────────────────────────────────
     document.getElementById('ganttCloseBtn').addEventListener('click', cerrarGantt);
     document.getElementById('ganttOverlay').addEventListener('click', e => {
@@ -1459,6 +1504,21 @@
     });
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') cerrarGantt();
+    });
+    document.getElementById('btnGanttAnterior').addEventListener('click', () => {
+        ganttOffsetMin = Math.max(0, ganttOffsetMin - VENTANA_MINUTOS);
+        renderGantt(currentRows);
+    });
+    document.getElementById('btnGanttSiguiente').addEventListener('click', () => {
+        ganttOffsetMin += VENTANA_MINUTOS;
+        renderGantt(currentRows);
+    });
+    document.getElementById('btnGanttAhora').addEventListener('click', () => {
+        const ahora = new Date();
+        let ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
+        if (ahora.getHours() < 12) ahoraMin += 24 * 60;
+        ganttOffsetMin = Math.max(0, ahoraMin - 15);
+        renderGantt(currentRows);
     });
 
     // ─────────────────────────────────────────────
