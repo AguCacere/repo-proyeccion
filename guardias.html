@@ -7,89 +7,183 @@
     <title>Guardias — Proyección Mensual</title>
     <link rel="stylesheet" href="css/style.css?v=6">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        body { background-color: #f8f9fa; }
+        /* ── Base ── */
+        body { background: #F0F4F8; }
 
-        .page-content {
-            padding: 40px 40px 60px;
-        }
+        .page-content { padding: 32px 40px 60px; }
 
-        /* ── Header ── */
+        /* ── Page header ── */
         .page-header {
-            margin-bottom: 32px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            gap: 16px;
         }
-        .page-header h1 {
-            font-size: 1.5rem;
+        .page-header-left { display: flex; align-items: center; gap: 14px; }
+        .page-header-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            flex-shrink: 0;
+            box-shadow: 0 4px 14px rgba(59,130,246,0.35);
+        }
+        .page-header-texts h1 {
+            font-size: 1.35rem;
             font-weight: 700;
             color: #111827;
-            margin-bottom: 4px;
+            margin: 0 0 3px;
+            line-height: 1.2;
         }
-        .page-header p {
-            font-size: 0.875rem;
+        .page-header-texts p {
+            font-size: 0.8rem;
             color: #6B7280;
+            margin: 0;
         }
+        .page-header-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            background: #F1F5F9;
+            color: #64748B;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .page-header-badge.active {
+            background: #DCFCE7;
+            color: #15803D;
+        }
+
+        /* ── Session banner ── */
+        .session-banner {
+            background: #FFFBEB;
+            border: 1px solid #FDE68A;
+            border-radius: 12px;
+            padding: 13px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+        .session-banner.hidden { display: none; }
+        .session-banner-left { display: flex; align-items: center; gap: 10px; }
+        .session-banner-icon {
+            width: 34px;
+            height: 34px;
+            background: #FEF3C7;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #D97706;
+            flex-shrink: 0;
+        }
+        .session-banner-texts { display: flex; flex-direction: column; gap: 1px; }
+        .session-banner-title { font-size: 0.8rem; font-weight: 700; color: #92400E; }
+        .session-banner-detail { font-size: 0.75rem; color: #B45309; }
+        .btn-nueva-guardia {
+            padding: 6px 14px;
+            background: #fff;
+            border: 1px solid #FDE68A;
+            border-radius: 8px;
+            color: #92400E;
+            font-family: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 150ms, border-color 150ms;
+            flex-shrink: 0;
+        }
+        .btn-nueva-guardia:hover { background: #FEF3C7; border-color: #FCD34D; }
 
         /* ── Upload grid ── */
         .upload-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
+            gap: 14px;
+            margin-bottom: 14px;
         }
-
-        @media (max-width: 700px) {
-            .upload-grid { grid-template-columns: 1fr; }
-        }
+        @media (max-width: 700px) { .upload-grid { grid-template-columns: 1fr; } }
 
         /* ── Upload card ── */
         .upload-card {
             background: #ffffff;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            border: 1px solid #f0f0f0;
+            border-radius: 14px;
+            padding: 18px 20px;
+            border: 1.5px solid #E2E8F0;
+            transition: border-color 250ms, box-shadow 250ms;
         }
-
-        .upload-card-label {
-            font-size: 0.72rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: #9CA3AF;
+        .upload-card.loaded {
+            border-color: #86EFAC;
+            box-shadow: 0 0 0 3px rgba(134,239,172,0.18);
+        }
+        .upload-card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
             margin-bottom: 12px;
         }
-
-        .upload-card-title {
-            font-size: 0.95rem;
+        .step-num {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #EFF6FF;
+            color: #2563EB;
+            font-size: 0.68rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: background 250ms, color 250ms;
+        }
+        .upload-card.loaded .step-num {
+            background: #DCFCE7;
+            color: #15803D;
+        }
+        .upload-card-label {
+            font-size: 0.68rem;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #94A3B8;
+        }
+        .upload-card-title {
+            font-size: 0.9rem;
+            font-weight: 700;
             color: #111827;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
-
         .upload-card-hint {
-            font-size: 0.8rem;
+            font-size: 0.77rem;
             color: #6B7280;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
-
         .upload-file-area {
             border: 2px dashed #E5E7EB;
             border-radius: 10px;
-            padding: 20px 16px;
+            padding: 16px;
             text-align: center;
             cursor: pointer;
             transition: border-color 200ms, background 200ms;
             position: relative;
         }
-
-        .upload-file-area:hover,
-        .upload-file-area.dragover {
+        .upload-file-area:hover, .upload-file-area.dragover {
             border-color: #3b82f6;
             background: #eff6ff;
         }
-
         .upload-file-area input[type="file"] {
             position: absolute;
             inset: 0;
@@ -98,81 +192,60 @@
             width: 100%;
             height: 100%;
         }
-
         .upload-file-icon {
-            width: 36px;
-            height: 36px;
-            background: #f3f4f6;
+            width: 32px;
+            height: 32px;
+            background: #F1F5F9;
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 10px;
-            color: #6B7280;
+            margin: 0 auto 8px;
+            color: #94A3B8;
         }
-
-        .upload-file-text {
-            font-size: 0.82rem;
-            color: #6B7280;
-        }
-
-        .upload-file-text strong {
-            color: #3b82f6;
-        }
-
-        .upload-file-ext {
-            font-size: 0.72rem;
-            color: #9CA3AF;
-            margin-top: 4px;
-        }
-
+        .upload-file-text { font-size: 0.79rem; color: #6B7280; }
+        .upload-file-text strong { color: #3b82f6; }
+        .upload-file-ext { font-size: 0.69rem; color: #9CA3AF; margin-top: 3px; }
         .upload-status {
-            margin-top: 12px;
-            font-size: 0.82rem;
+            margin-top: 10px;
+            font-size: 0.79rem;
             color: #16a34a;
             font-weight: 500;
             display: none;
             align-items: center;
             gap: 6px;
         }
-
-        .upload-status.visible {
-            display: flex;
-        }
-
-        .upload-status svg {
-            flex-shrink: 0;
-        }
+        .upload-status.visible { display: flex; }
+        .upload-status svg { flex-shrink: 0; }
 
         /* ── Generate button ── */
         .btn-generar {
             width: 100%;
-            padding: 14px;
-            background: #3b82f6;
+            padding: 13px;
+            background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
             color: #ffffff;
             border: none;
             border-radius: 10px;
             font-family: inherit;
-            font-size: 0.95rem;
+            font-size: 0.93rem;
             font-weight: 600;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            margin-bottom: 32px;
-            transition: background 200ms, transform 200ms, box-shadow 200ms;
+            margin-bottom: 24px;
+            transition: opacity 200ms, transform 200ms, box-shadow 200ms;
+            box-shadow: 0 4px 14px rgba(37,99,235,0.3);
         }
-
         .btn-generar:hover:not(:disabled) {
-            background: #2563eb;
+            opacity: 0.92;
             transform: translateY(-1px);
-            box-shadow: 0 4px 14px rgba(59,130,246,0.35);
+            box-shadow: 0 6px 20px rgba(37,99,235,0.38);
         }
-
         .btn-generar:disabled {
-            background: #D1D5DB;
-            color: #9CA3AF;
+            background: #E2E8F0;
+            color: #94A3B8;
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
@@ -181,27 +254,21 @@
         /* ── Results panel ── */
         .results-panel {
             background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            border: 1px solid #f0f0f0;
+            border-radius: 14px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 6px 20px rgba(0,0,0,0.04);
+            border: 1px solid #E2E8F0;
             overflow: hidden;
         }
-
         .results-panel-header {
-            padding: 18px 24px;
-            border-bottom: 1px solid #f0f0f0;
+            padding: 16px 20px;
+            border-bottom: 1px solid #F1F5F9;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
             gap: 12px;
+            flex-wrap: wrap;
         }
-
-        .results-panel-header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
+        .results-panel-header-left { display: flex; align-items: flex-start; gap: 12px; }
         .panel-hicon {
             width: 32px;
             height: 32px;
@@ -210,106 +277,152 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            margin-top: 2px;
         }
-
-        .ph-blue { background: #eff6ff; color: #3b82f6; }
-
-        .results-panel-title {
-            font-size: 0.9rem;
+        .ph-blue { background: #EFF6FF; color: #3B82F6; }
+        .results-panel-title { font-size: 0.88rem; font-weight: 700; color: #111827; margin-bottom: 4px; }
+        .rp-stats {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .rp-stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 9px;
+            border-radius: 20px;
+            font-size: 0.68rem;
             font-weight: 600;
-            color: #111827;
         }
-
-        .results-panel-sub {
-            font-size: 0.78rem;
-            color: #6B7280;
-            margin-top: 1px;
-        }
+        .rp-stat.total   { background: #F1F5F9; color: #475569; }
+        .rp-stat.exec    { background: #EFF6FF; color: #1D4ED8; }
+        .rp-stat.delayed { background: #FEF2F2; color: #DC2626; }
+        .rp-stat.fast    { background: #F0FDF4; color: #15803D; }
 
         /* ── Table wrapper ── */
-        .table-scroll {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
+        .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .cc-table {
             width: 100%;
+            min-width: 900px;
             border-collapse: collapse;
-            font-size: 0.82rem;
+            font-size: 12.5px;
         }
-
         .cc-table thead th {
-            background: #f9fafb;
-            padding: 10px 14px;
+            position: sticky;
+            top: 0;
+            background: #FAFBFC;
+            padding: 9px 12px;
             text-align: left;
-            font-size: 0.7rem;
-            font-weight: 600;
+            font-size: 10px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #6B7280;
-            border-bottom: 1px solid #E5E7EB;
+            letter-spacing: 0.06em;
+            color: #94A3B8;
+            border-bottom: 1px solid #E2E8F0;
             white-space: nowrap;
+            z-index: 1;
         }
-
-        .cc-table tbody tr {
-            border-bottom: 1px solid #f3f4f6;
-            transition: background 150ms;
+        .cc-table tbody tr.cc-main-row {
+            border-bottom: 1px solid #F8FAFC;
+            transition: background 100ms;
+            cursor: pointer;
         }
-
-        .cc-table tbody tr:last-child {
-            border-bottom: none;
-        }
-
-        .cc-table tbody tr:hover {
-            background: #f9fafb;
-        }
-
+        .cc-table tbody tr.cc-main-row:hover { background: #F5F8FF; }
         .cc-table tbody td {
-            padding: 10px 14px;
+            padding: 9px 12px;
             color: #374151;
             white-space: nowrap;
+            vertical-align: middle;
         }
+
+        /* Expand chevron */
+        .cc-expand-cell { width: 28px; color: #D1D5DB; transition: color 150ms; }
+        .cc-main-row:hover .cc-expand-cell { color: #94A3B8; }
+        .cc-main-row.expanded .cc-expand-cell { color: #3B82F6; }
+        .cc-chevron { display: block; transition: transform 200ms; }
+        .cc-main-row.expanded .cc-chevron { transform: rotate(90deg); }
+
+        /* Detail row */
+        .cc-detail-row { display: none; background: #F8FAFF; }
+        .cc-detail-row.visible { display: table-row; }
+        .cc-detail-row td { padding: 7px 12px 10px 40px; border-bottom: 1px solid #EEF2FF; }
+        .cc-detail-grid { display: flex; flex-wrap: wrap; gap: 20px; }
+        .cc-detail-item { display: flex; flex-direction: column; gap: 2px; }
+        .cc-detail-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #94A3B8; }
+        .cc-detail-value { font-size: 12px; color: #374151; font-weight: 500; }
+
+        /* On Line cell */
+        .cell-online {
+            background: #EFF6FF;
+            color: #1D4ED8;
+            font-weight: 700;
+            border-radius: 5px;
+            padding: 2px 7px;
+            display: inline-block;
+            white-space: nowrap;
+            font-size: 11.5px;
+        }
+        .cell-online-empty { color: #CBD5E1; }
 
         /* Row states */
-        .cc-table tbody tr.row-error {
-            background: #FEF2F2;
-        }
-        .cc-table tbody tr.row-error:hover {
-            background: #fee2e2;
-        }
-
-        .cc-table tbody tr.row-missing {
-            background: #f9fafb;
-            color: #9CA3AF;
-        }
-        .cc-table tbody tr.row-missing:hover {
-            background: #f3f4f6;
-        }
+        .cc-table tbody tr.row-error { background: #FFF5F5; }
+        .cc-table tbody tr.row-error:hover { background: #FEE2E2; }
+        .cc-table tbody tr.row-missing { background: #FAFAFA; }
+        .cc-table tbody tr.row-missing td { color: #9CA3AF; }
+        .cc-table tbody tr.row-missing:hover { background: #F3F4F6; }
 
         /* Cell states */
-        .cell-error {
-            color: #dc2626;
-            font-weight: 600;
-        }
+        .cell-error { color: #dc2626; font-weight: 600; }
 
+        /* Increment badges */
         .cell-increment-pos {
-            color: #dc2626;
-            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            background: #FEF2F2;
+            color: #DC2626;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
         }
-
         .cell-increment-neg {
-            color: #16a34a;
-            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            background: #F0FDF4;
+            color: #15803D;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
         }
 
-        .badge-missing {
+        /* Estado badges */
+        .badge-estado {
             display: inline-flex;
             align-items: center;
             padding: 2px 8px;
-            background: #f3f4f6;
-            color: #9CA3AF;
             border-radius: 20px;
-            font-size: 0.7rem;
+            font-size: 10.5px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .badge-estado-ok    { background: #DCFCE7; color: #15803D; }
+        .badge-estado-error { background: #FEE2E2; color: #DC2626; }
+        .badge-estado-warn  { background: #FEF3C7; color: #92400E; }
+        .badge-estado-none  { background: #F1F5F9; color: #94A3B8; }
+
+        /* Missing badge */
+        .badge-missing {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            background: #F1F5F9;
+            color: #94A3B8;
+            border-radius: 20px;
+            font-size: 0.67rem;
             font-weight: 600;
             letter-spacing: 0.03em;
         }
@@ -325,14 +438,139 @@
             gap: 12px;
             text-align: center;
         }
+        .empty-state-cc svg { opacity: 0.35; }
+        .empty-state-cc p { font-size: 0.875rem; }
 
-        .empty-state-cc svg {
-            opacity: 0.4;
+        /* ── Panel header right group ── */
+        .results-panel-header-right {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex-shrink: 0;
+        }
+        .umbral-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11.5px;
+            color: #64748B;
+        }
+        .umbral-group input {
+            width: 44px;
+            font-size: 11.5px;
+            padding: 4px 6px;
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
+            text-align: center;
+            font-family: inherit;
+            background: #FAFAFA;
+            color: #374151;
         }
 
-        .empty-state-cc p {
-            font-size: 0.875rem;
+        /* ── Action buttons ── */
+        .btn-ver-gantt {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 13px;
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            border-radius: 8px;
+            color: #2563EB;
+            font-family: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 150ms, border-color 150ms, box-shadow 150ms;
         }
+        .btn-ver-gantt:hover {
+            background: #DBEAFE;
+            border-color: #93C5FD;
+            box-shadow: 0 2px 8px rgba(59,130,246,0.15);
+        }
+        .btn-copiar-mail {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 13px;
+            background: #F0FDF4;
+            border: 1px solid #BBF7D0;
+            border-radius: 8px;
+            color: #15803D;
+            font-family: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 150ms, border-color 150ms, box-shadow 150ms;
+        }
+        .btn-copiar-mail:hover {
+            background: #DCFCE7;
+            border-color: #86EFAC;
+            box-shadow: 0 2px 8px rgba(16,185,129,0.12);
+        }
+
+        /* ── Gantt modal ── */
+        .gantt-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15,23,42,0.45);
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 200ms;
+            pointer-events: none;
+        }
+        .gantt-overlay.open { opacity: 1; pointer-events: all; }
+        .gantt-panel {
+            position: fixed;
+            top: 5vh;
+            left: 220px;
+            right: 0;
+            margin: 0 auto;
+            width: calc(100vw - 260px);
+            max-height: 90vh;
+            background: #fff;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08);
+            z-index: 1000;
+            transform: translateY(12px);
+            transition: transform 200ms;
+        }
+        .gantt-overlay.open .gantt-panel { transform: translateY(0); }
+        .gantt-header {
+            padding: 18px 24px 14px;
+            border-bottom: 1px solid #F1F5F9;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-shrink: 0;
+        }
+        .gantt-header-left h2 { font-size: 1rem; font-weight: 700; color: #111827; margin-bottom: 2px; }
+        .gantt-header-left p { font-size: 0.78rem; color: #6B7280; }
+        .gantt-close-btn {
+            background: #F1F5F9;
+            border: none;
+            cursor: pointer;
+            color: #64748B;
+            font-size: 0.85rem;
+            padding: 6px 10px;
+            border-radius: 8px;
+            line-height: 1;
+            transition: background 150ms, color 150ms;
+        }
+        .gantt-close-btn:hover { background: #E2E8F0; color: #111827; }
+        .gantt-body { flex: 1; overflow-y: auto; padding: 18px 24px 24px; }
+        .gantt-legend {
+            display: flex;
+            gap: 14px;
+            font-size: 11.5px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            color: #64748B;
+        }
+        .gantt-canvas-wrap { position: relative; }
     </style>
 </head>
 
@@ -383,16 +621,41 @@
 
             <!-- Header -->
             <div class="page-header">
-                <h1>Guardias</h1>
-                <p id="pageSubtitle">Cargá los archivos para comenzar</p>
+                <div class="page-header-left">
+                    <div class="page-header-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <div class="page-header-texts">
+                        <h1>Guardias</h1>
+                        <p id="pageSubtitle">Cargá los archivos para comenzar</p>
+                    </div>
+                </div>
+                <span class="page-header-badge" id="headerBadge">Sin sesión</span>
+            </div>
+
+            <!-- Session banner — visible when localStorage has saved data -->
+            <div class="session-banner hidden" id="sessionBanner">
+                <div class="session-banner-left">
+                    <div class="session-banner-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="session-banner-texts">
+                        <span class="session-banner-title">Sesión activa</span>
+                        <span class="session-banner-detail" id="sessionDetail">—</span>
+                    </div>
+                </div>
+                <button class="btn-nueva-guardia" id="btnNuevaGuardia">Nueva guardia</button>
             </div>
 
             <!-- Upload cards -->
             <div class="upload-grid">
 
                 <!-- Card 1: Comparativo Excel -->
-                <div class="upload-card">
-                    <div class="upload-card-label">Archivo Comparativo</div>
+                <div class="upload-card" id="cardComparativo">
+                    <div class="upload-card-header">
+                        <span class="step-num">1</span>
+                        <span class="upload-card-label">Archivo Comparativo</span>
+                    </div>
                     <div class="upload-card-title">Comparativo Excel</div>
                     <div class="upload-card-hint">Seleccioná el Excel comparativo — solapa CaminoCritico</div>
                     <div class="upload-file-area" id="areaComparativo">
@@ -410,8 +673,11 @@
                 </div>
 
                 <!-- Card 2: Bitácora ProBatch CSV -->
-                <div class="upload-card">
-                    <div class="upload-card-label">Consulta Log Operaciones</div>
+                <div class="upload-card" id="cardProbatch">
+                    <div class="upload-card-header">
+                        <span class="step-num">2</span>
+                        <span class="upload-card-label">Consulta Log Operaciones</span>
+                    </div>
                     <div class="upload-card-title">Bitácora ProBatch</div>
                     <div class="upload-card-hint">Seleccioná el CSV exportado de ProBatch</div>
                     <div class="upload-file-area" id="areaProbatch">
@@ -442,19 +708,174 @@
         </div><!-- /.page-content -->
     </main>
 
+    <!-- Gantt modal -->
+    <div class="gantt-overlay" id="ganttOverlay">
+        <div class="gantt-panel">
+            <div class="gantt-header">
+                <div class="gantt-header-left">
+                    <h2>Gantt — Camino Crítico</h2>
+                    <p id="ganttSubtitle"></p>
+                </div>
+                <button class="gantt-close-btn" id="ganttCloseBtn">✕</button>
+            </div>
+            <div class="gantt-body">
+                <div class="gantt-legend">
+                    <span><span style="background:#10B981;width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>OK</span>
+                    <span><span style="background:#F59E0B;width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Demorado</span>
+                    <span><span style="background:#EF4444;width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Error</span>
+                    <span><span style="background:rgba(148,163,184,0.35);width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Proyección</span>
+                    <span><span style="background:#3B82F6;width:2px;height:12px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Ahora</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px 0;border-top:0.5px solid #E2E8F0;border-bottom:0.5px solid #E2E8F0;">
+                    <button id="btnGanttAnterior" style="padding:6px 14px;border:0.5px solid #E2E8F0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-family:inherit;">← Anterior</button>
+                    <span id="ganttLabelVentana" style="flex:1;text-align:center;font-size:14px;font-weight:500;color:#374151;"></span>
+                    <button id="btnGanttSiguiente" style="padding:6px 14px;border:0.5px solid #E2E8F0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-family:inherit;">Siguiente →</button>
+                    <button id="btnGanttAhora" style="padding:6px 14px;border:0.5px solid #3B82F6;border-radius:6px;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-size:12px;font-family:inherit;font-weight:600;">Ir a ahora</button>
+                </div>
+                <div class="gantt-canvas-wrap" id="ganttCanvasWrap">
+                    <canvas id="ganttChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline modal -->
+    <div id="timelineOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.45);z-index:999;align-items:center;justify-content:center;">
+        <div style="background:white;border-radius:16px;width:600px;max-height:90vh;overflow-y:auto;padding:28px;position:relative;z-index:1000;box-shadow:0 20px 60px rgba(0,0,0,0.18),0 4px 16px rgba(0,0,0,0.08);margin:0 20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <span style="font-size:15px;font-weight:600;color:#111827;">Línea de tiempo</span>
+                <button onclick="cerrarTimeline()" style="background:#F1F5F9;border:none;font-size:14px;cursor:pointer;color:#64748B;border-radius:8px;padding:6px 10px;line-height:1;transition:background 150ms;" onmouseover="this.style.background='#E2E8F0'" onmouseout="this.style.background='#F1F5F9'">✕</button>
+            </div>
+            <div id="timelineContenido"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script>
     // ─────────────────────────────────────────────
     //  State
     // ─────────────────────────────────────────────
-    let parsedComparativo = null;
-    let parsedProbatch    = null;
+    let parsedComparativo        = null;
+    let parsedProbatch           = null;
+    let archivoComparativoNombre = null;
+    let archivoCsvNombre         = null;
+    let currentRows              = null;
+    let ganttOffsetMin           = 0;
+    const VENTANA_MINUTOS        = 60;
+
+    const HITOS_CRITICOS = ['80051', '4153', '27750', '7211', '99011'];
+    const HITO_FIN       = '99011';
+
+    const STORAGE_KEY = 'sqr_guardia_sesion';
+
+    // ─────────────────────────────────────────────
+    //  localStorage helpers
+    // ─────────────────────────────────────────────
+    function guardarSesion(datos) {
+        const sesion = {
+            timestamp:           new Date().toISOString(),
+            comparativoNombre:   archivoComparativoNombre || '—',
+            csvNombre:           archivoCsvNombre         || '—',
+            datos
+        };
+        try {
+            const json = JSON.stringify(sesion);
+            if (json.length > 4 * 1024 * 1024) {
+                console.warn('Datos muy grandes para localStorage — solo en memoria.');
+                return;
+            }
+            localStorage.setItem(STORAGE_KEY, json);
+            mostrarBannerSesion(sesion);
+        } catch (e) {
+            console.warn('No se pudo guardar en localStorage:', e);
+        }
+    }
+
+    function restaurarFechas(row) {
+        // JSON.parse turns Dates into strings — convert back
+        const rehydrate = val => {
+            if (!val) return null;
+            const d = new Date(val);
+            if (isNaN(d)) return null;
+            d._local = true;
+            return d;
+        };
+        return {
+            ...row,
+            onLine:           rehydrate(row.onLine),
+            deberiaFinalizar: rehydrate(row.deberiaFinalizar)
+        };
+    }
+
+    function mostrarBannerSesion(sesion) {
+        const ts  = new Date(sesion.timestamp);
+        const pad = n => String(n).padStart(2, '0');
+        const hora = `${pad(ts.getHours())}:${pad(ts.getMinutes())}`;
+        document.getElementById('sessionDetail').textContent =
+            `Cargado a las ${hora} · ${sesion.comparativoNombre} + ${sesion.csvNombre}`;
+        document.getElementById('sessionBanner').classList.remove('hidden');
+        const badge = document.getElementById('headerBadge');
+        if (badge) {
+            badge.textContent = `Sesión activa · ${hora}`;
+            badge.classList.add('active');
+        }
+    }
+
+    function restaurarSesion() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const sesion = JSON.parse(raw);
+            if (!sesion?.datos?.length) return;
+            mostrarBannerSesion(sesion);
+            const rows = sesion.datos.map(restaurarFechas);
+            renderTabla(rows);
+            updateSubtitle();
+        } catch (e) {
+            console.warn('No se pudo restaurar la sesión:', e);
+            localStorage.removeItem(STORAGE_KEY);
+        }
+    }
 
     // ─────────────────────────────────────────────
     //  Utility — parse duración HH:MM:SS → minutes
     // ─────────────────────────────────────────────
-    function parseDuracion(str) {
-        if (!str) return null;
-        const s = typeof str === 'string' ? str : String(str);
+    // ── Excel serial → JS Date (UTC) ──────────────────────────────────────
+    function excelSerialToDate(serial) {
+        if (!serial) return null;
+        if (typeof serial === 'string' && serial.includes(':')) return serial;
+        const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+        return date;
+    }
+
+    // Display HH:MM from a UTC-based Date (XLSX-sourced)
+    function formatHHMM(date) {
+        if (!date) return '—';
+        const h = String(date.getUTCHours()).padStart(2, '0');
+        const m = String(date.getUTCMinutes()).padStart(2, '0');
+        return `${h}:${m}`;
+    }
+
+    // Convert Excel time fraction (or string) to HH:MM:SS string for parseDuracion
+    function excelDurToStr(val) {
+        if (!val) return null;
+        if (typeof val === 'string') return val;
+        if (val instanceof Date) return formatHHMM(val) + ':00';
+        const totalSecs = Math.round(val * 86400);
+        const h = Math.floor(totalSecs / 3600);
+        const m = Math.floor((totalSecs % 3600) / 60);
+        const s = totalSecs % 60;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    function parseDuracion(val) {
+        if (!val) return null;
+        if (val instanceof Date) {
+            return val.getUTCHours() * 60 + val.getUTCMinutes() + val.getUTCSeconds() / 60;
+        }
+        const s = typeof val === 'string' ? val : String(val);
         const parts = s.split(':').map(Number);
         if (parts.length === 3) return parts[0] * 60 + parts[1] + parts[2] / 60;
         if (parts.length === 2) return parts[0] * 60 + parts[1];
@@ -473,11 +894,38 @@
     function formatDateTime(val) {
         if (!val) return '—';
         try {
-            const d = new Date(val);
+            const d = val instanceof Date ? val : new Date(val);
             if (isNaN(d)) return String(val);
             const pad = n => String(n).padStart(2, '0');
+            // XLSX-sourced Dates were built via UTC arithmetic — read UTC
+            if (val instanceof Date && !(val._local)) {
+                return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+            }
             return `${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         } catch { return String(val); }
+    }
+
+    // Format only the HH:MM portion of a date
+    function formatTimeOnly(val) {
+        if (!val) return '—';
+        try {
+            const d = val instanceof Date ? val : new Date(val);
+            if (isNaN(d)) return '—';
+            const pad = n => String(n).padStart(2, '0');
+            if (val instanceof Date && !val._local) {
+                return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+            }
+            return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        } catch { return '—'; }
+    }
+
+    // CSV-sourced Date (local time) — flag to use local methods in formatDateTime
+    function csvDate(str) {
+        if (!str) return null;
+        const d = new Date(str);
+        if (isNaN(d)) return null;
+        d._local = true;
+        return d;
     }
 
     // ─────────────────────────────────────────────
@@ -489,7 +937,7 @@
             reader.onerror = () => reject(new Error('Error al leer el archivo Excel.'));
             reader.onload = (e) => {
                 try {
-                    const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+                    const wb = XLSX.read(e.target.result, { type: 'array', cellDates: false });
 
                     // Find sheet whose name contains "caminocritico" (case-insensitive, ignore spaces)
                     const sheetName = wb.SheetNames.find(n =>
@@ -502,28 +950,40 @@
                     const ws   = wb.Sheets[sheetName];
                     const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-                    // Find row that has "Instancia" in column A
+                    // Find the header row by looking for a row that has I, Lote and Proceso together
                     const headerRow = data.findIndex(r =>
-                        String(r[0]).toLowerCase().includes('instancia')
+                        r.some(cell => String(cell).trim() === 'I') &&
+                        r.some(cell => String(cell).trim() === 'Lote') &&
+                        r.some(cell => String(cell).trim() === 'Proceso')
                     );
                     if (headerRow === -1) {
-                        return reject(new Error('No se encontró la fila de encabezado con "Instancia".'));
+                        return reject(new Error('No se encontró la fila de encabezado con "I", "Lote" y "Proceso".'));
                     }
 
-                    // Cols: Instancia(0), Lote(1), Proceso(2), SQR(3),
-                    //       FechaInicio(4), FechaFin(5), Duracion(6)
+                    // Resolve column positions dynamically — safe against leading/extra columns
+                    const headers = data[headerRow];
+                    const colI          = headers.findIndex(h => String(h).trim() === 'I');
+                    const colLote       = headers.findIndex(h => String(h).trim() === 'Lote');
+                    const colProceso    = headers.findIndex(h => String(h).trim() === 'Proceso');
+                    const colSQR        = headers.findIndex(h => String(h).trim() === 'SQR');
+                    const colFechaInicio = headers.findIndex(h => String(h).trim() === 'Fecha Inicio');
+                    const colFechaFin   = headers.findIndex(h => String(h).trim() === 'Fecha Fin');
+                    const colDuracion   = headers.findIndex(h =>
+                        String(h).trim() === 'Duración' || String(h).trim() === 'Duracion'
+                    );
+
                     const rows = data
                         .slice(headerRow + 1)
-                        .filter(r => r[0] && r[2]);
+                        .filter(r => r[colI] && r[colProceso]);
 
                     resolve(rows.map(r => ({
-                        instancia:     r[0],
-                        lote:          r[1],
-                        proceso:       String(r[2]).trim(),
-                        sqr:           r[3],
-                        fechaInicioRef: r[4],
-                        fechaFinRef:    r[5],
-                        duracionRef:    r[6]
+                        instancia:      r[colI],
+                        lote:           r[colLote],
+                        proceso:        String(r[colProceso]).trim(),
+                        sqr:            r[colSQR],
+                        fechaInicioRef: excelSerialToDate(r[colFechaInicio]),
+                        fechaFinRef:    excelSerialToDate(r[colFechaFin]),
+                        duracionRef:    excelDurToStr(r[colDuracion])
                     })));
                 } catch (err) {
                     reject(err);
@@ -559,6 +1019,19 @@
     //  Cross-reference logic
     // ─────────────────────────────────────────────
     function generarCaminoCritico(comparativo, probatch) {
+        // ── Falta Batch: sum of duracionRef from row i to proceso 99011 ──
+        const idx99011 = comparativo.findIndex(r => String(r.proceso).trim() === '99011');
+        const hasta = idx99011 >= 0 ? idx99011 + 1 : comparativo.length;
+        comparativo.forEach((row, i) => {
+            if (i >= hasta) {
+                row.faltaBatch = 0;
+            } else {
+                row.faltaBatch = comparativo
+                    .slice(i, hasta)
+                    .reduce((acc, r) => acc + (parseDuracion(r.duracionRef) || 0), 0);
+            }
+        });
+
         // Build index: comandoCodigo → [ rows ]
         const probatchMap = {};
         probatch.forEach(r => {
@@ -576,7 +1049,7 @@
 
             const duracionRefMin  = parseDuracion(ref.duracionRef);
             const duracionRealMin = real ? parseDuracion(real.duracion) : null;
-            const fechaInicioReal = real ? new Date(real.fechaInicio) : null;
+            const fechaInicioReal = real ? csvDate(real.fechaInicio) : null;
 
             // Debería finalizar = Inicio real + Duración referencia
             const deberiaFinalizar =
@@ -590,16 +1063,25 @@
                     ? duracionRealMin - duracionRefMin
                     : null;
 
+            // On Line = Inicio real + Falta Batch
+            const onLineDate = fechaInicioReal && ref.faltaBatch != null
+                ? (() => { const d = new Date(fechaInicioReal.getTime() + ref.faltaBatch * 60000); d._local = true; return d; })()
+                : null;
+
             return {
-                instancia:     ref.instancia,
-                lote:          ref.lote,
-                proceso:       ref.proceso,
-                sqr:           ref.sqr,
-                duracionRef:   ref.duracionRef,
+                instancia:       ref.instancia,
+                lote:            ref.lote,
+                proceso:         ref.proceso,
+                sqr:             ref.sqr,
+                duracionRef:     ref.duracionRef,
+                fechaInicioRef:  ref.fechaInicioRef,   // Excel planned start time
+                fechaFinRef:     ref.fechaFinRef,      // Excel planned finish time
+                faltaBatch:      ref.faltaBatch,
                 fechaInicioReal: real?.fechaInicio || null,
                 fechaFinReal:    real?.fechaFin    || null,
                 duracionReal:    real?.duracion    || null,
                 estado:          real?.estado      || '—',
+                onLine:          onLineDate,
                 deberiaFinalizar,
                 incremento,
                 encontrado: !!real
@@ -609,9 +1091,8 @@
         // Calculate Wait: inicio siguiente − fin actual (minutes)
         return rows.map((row, i, arr) => {
             const siguiente      = arr[i + 1];
-            const finActual      = row.fechaFinReal    ? new Date(row.fechaFinReal)          : null;
-            const inicioSiguiente = siguiente?.fechaInicioReal
-                ? new Date(siguiente.fechaInicioReal) : null;
+            const finActual       = row.fechaFinReal            ? csvDate(row.fechaFinReal)            : null;
+            const inicioSiguiente = siguiente?.fechaInicioReal ? csvDate(siguiente.fechaInicioReal) : null;
 
             const waitMin =
                 finActual && inicioSiguiente && !isNaN(finActual) && !isNaN(inicioSiguiente)
@@ -626,6 +1107,7 @@
     //  Render table
     // ─────────────────────────────────────────────
     function renderTabla(rows) {
+        currentRows = rows;
         const container = document.getElementById('resultsContainer');
 
         const html = `
@@ -637,84 +1119,155 @@
                     </div>
                     <div>
                         <div class="results-panel-title">Camino Crítico</div>
-                        <div class="results-panel-sub">${rows.length} procesos · ${rows.filter(r => r.encontrado).length} con datos reales · ${rows.filter(r => !r.encontrado).length} sin datos</div>
+                        <div class="rp-stats">
+                            <span class="rp-stat total">${rows.length} procesos</span>
+                            <span class="rp-stat exec">${rows.filter(r => r.encontrado).length} ejecutados</span>
+                            ${rows.filter(r => r.incremento > 5 && r.encontrado).length > 0 ? `<span class="rp-stat delayed">${rows.filter(r => r.incremento > 5 && r.encontrado).length} demorado${rows.filter(r => r.incremento > 5 && r.encontrado).length > 1 ? 's' : ''}</span>` : ''}
+                            ${rows.filter(r => r.incremento < -5 && r.encontrado).length > 0 ? `<span class="rp-stat fast">${rows.filter(r => r.incremento < -5 && r.encontrado).length} más rápido${rows.filter(r => r.incremento < -5 && r.encontrado).length > 1 ? 's' : ''}</span>` : ''}
+                        </div>
                     </div>
+                </div>
+                <div class="results-panel-header-right">
+                    <div class="umbral-group">
+                        <label for="umbralMin">Umbral:</label>
+                        <input type="number" id="umbralMin" value="5" min="0" max="60">
+                        <span>min</span>
+                    </div>
+                    <button class="btn-copiar-mail" id="btnCopiarMail">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        Copiar para mail
+                    </button>
+                    <button class="btn-ver-gantt" id="btnVerTimeline">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        Ver línea de tiempo
+                    </button>
+                    <button class="btn-ver-gantt" id="btnVerGantt">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="14" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>
+                        Ver Gantt
+                    </button>
                 </div>
             </div>
             <div class="table-scroll">
                 <table class="cc-table">
                     <thead>
                         <tr>
+                            <th></th>
                             <th>Inst.</th>
                             <th>Lote</th>
                             <th>Proceso</th>
                             <th>SQR</th>
-                            <th>Dur. Ref.</th>
                             <th>Inicio Real</th>
+                            <th>On Line</th>
                             <th>Fin Real</th>
+                            <th>Dur. Ref.</th>
                             <th>Dur. Real</th>
-                            <th>Debería Fin.</th>
                             <th>Incremento</th>
-                            <th>Wait</th>
                             <th>Estado</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${rows.map(row => buildRow(row)).join('')}
+                        ${rows.map((row, i) => buildRow(row, i)).join('')}
                     </tbody>
                 </table>
             </div>
         </div>`;
 
         container.innerHTML = html;
+        document.getElementById('btnVerGantt').addEventListener('click', abrirGantt);
+        document.getElementById('btnVerTimeline').addEventListener('click', abrirTimeline);
+        document.getElementById('btnCopiarMail').addEventListener('click', copiarInforme);
     }
 
-    function buildRow(row) {
+    function buildRow(row, idx) {
         const isError   = String(row.estado).toUpperCase() === 'ERROR';
         const isMissing = !row.encontrado;
 
-        let rowClass = '';
-        if (isError)   rowClass = 'row-error';
-        else if (isMissing) rowClass = 'row-missing';
+        let rowStateClass = '';
+        if (isError)        rowStateClass = 'row-error';
+        else if (isMissing) rowStateClass = 'row-missing';
 
-        // Estado cell
-        const estadoCell = isError
-            ? `<td class="cell-error">${row.estado}</td>`
-            : `<td>${row.estado}</td>`;
+        // Estado cell — pill badge
+        let estadoCell;
+        const estadoStr = escHtml(row.estado);
+        if (isError) {
+            estadoCell = `<td><span class="badge-estado badge-estado-error">${estadoStr}</span></td>`;
+        } else if (row.estado && row.estado !== '—') {
+            estadoCell = `<td><span class="badge-estado badge-estado-ok">${estadoStr}</span></td>`;
+        } else {
+            estadoCell = `<td><span class="badge-estado badge-estado-none">—</span></td>`;
+        }
 
         // Proceso cell — badge if no data
         const procesoCell = isMissing
             ? `<td>${escHtml(row.proceso)} <span class="badge-missing">Sin datos</span></td>`
             : `<td>${escHtml(row.proceso)}</td>`;
 
-        // Incremento cell
-        let incrementoCell = '<td>—</td>';
+        // Incremento cell — badge with background
+        let incrementoCell = '<td><span style="color:#CBD5E1;">—</span></td>';
         if (row.incremento !== null) {
             const val = minToHHMM(row.incremento);
-            if (row.incremento > 0) {
-                incrementoCell = `<td class="cell-increment-pos">+${val}</td>`;
-            } else if (row.incremento < 0) {
-                incrementoCell = `<td class="cell-increment-neg">${val}</td>`;
-            } else {
-                incrementoCell = `<td>${val}</td>`;
-            }
+            if (row.incremento > 0)      incrementoCell = `<td><span class="cell-increment-pos">▲ +${val}</span></td>`;
+            else if (row.incremento < 0) incrementoCell = `<td><span class="cell-increment-neg">▼ ${val}</span></td>`;
+            else                          incrementoCell = `<td><span style="color:#94A3B8;font-size:11px;">${val}</span></td>`;
         }
 
-        return `
-        <tr class="${rowClass}">
+        const durRefDisplay = row.duracionRef
+            ? escHtml(String(row.duracionRef))
+            : '—';
+
+        // On Line cell
+        const onLineCell = row.onLine
+            ? `<td><span class="cell-online">${formatTimeOnly(row.onLine)}</span></td>`
+            : `<td><span class="cell-online-empty">—</span></td>`;
+
+        const mainRow = `
+        <tr class="cc-main-row ${rowStateClass}" onclick="toggleDetail(${idx})">
+            <td class="cc-expand-cell">
+                <svg class="cc-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </td>
             <td>${escHtml(String(row.instancia ?? '—'))}</td>
             <td>${escHtml(String(row.lote ?? '—'))}</td>
             ${procesoCell}
             <td>${escHtml(String(row.sqr ?? '—'))}</td>
-            <td>${escHtml(String(row.duracionRef ?? '—'))}</td>
             <td>${formatDateTime(row.fechaInicioReal)}</td>
+            ${onLineCell}
             <td>${formatDateTime(row.fechaFinReal)}</td>
+            <td>${durRefDisplay}</td>
             <td>${escHtml(String(row.duracionReal ?? '—'))}</td>
-            <td>${formatDateTime(row.deberiaFinalizar)}</td>
             ${incrementoCell}
-            <td>${minToHHMM(row.wait)}</td>
             ${estadoCell}
         </tr>`;
+
+        const detailRow = `
+        <tr class="cc-detail-row" id="detail-${idx}">
+            <td colspan="12">
+                <div class="cc-detail-grid">
+                    <div class="cc-detail-item">
+                        <span class="cc-detail-label">Falta Batch</span>
+                        <span class="cc-detail-value">${minToHHMM(row.faltaBatch)}</span>
+                    </div>
+                    <div class="cc-detail-item">
+                        <span class="cc-detail-label">Debería Fin.</span>
+                        <span class="cc-detail-value">${formatDateTime(row.deberiaFinalizar)}</span>
+                    </div>
+                    <div class="cc-detail-item">
+                        <span class="cc-detail-label">Wait</span>
+                        <span class="cc-detail-value">${minToHHMM(row.wait)}</span>
+                    </div>
+                </div>
+            </td>
+        </tr>`;
+
+        return mainRow + detailRow;
+    }
+
+    function toggleDetail(idx) {
+        const detailRow = document.getElementById(`detail-${idx}`);
+        const mainRow   = detailRow?.previousElementSibling;
+        if (!detailRow) return;
+        const isOpen = detailRow.classList.contains('visible');
+        detailRow.classList.toggle('visible', !isOpen);
+        mainRow?.classList.toggle('expanded', !isOpen);
     }
 
     function escHtml(str) {
@@ -723,6 +1276,685 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    // ─────────────────────────────────────────────
+    //  Timeline helpers
+    // ─────────────────────────────────────────────
+    const formatHora = (fechaStr) => {
+        if (!fechaStr) return '—';
+        const d = new Date(fechaStr);
+        if (isNaN(d)) return '—';
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    };
+
+    // Human-readable duration for timeline (e.g. "+1h 5min")
+    const minToHuman = (min) => {
+        if (min === null || min === undefined) return '—';
+        const sign = min < 0 ? '-' : '+';
+        const abs  = Math.abs(min);
+        const h    = Math.floor(abs / 60);
+        const m    = Math.round(abs % 60);
+        return h > 0 ? `${sign}${h}h ${m}min` : `${sign}${m}min`;
+    };
+
+    // Compute planned finish hour for a row.
+    // Priority chain (each step handles both Date objects and ISO/string values):
+    //  1. fechaFinRef  — Excel "Fecha Fin" column (UTC-based)
+    //  2. fechaInicioRef + duracionRef — Excel "Fecha Inicio" + duration (UTC-based)
+    //  3. deberiaFinalizar — fechaInicioReal + duracionRef (local-time, always computed)
+    const computeHoraRef = (fila) => {
+        // Generic converter: handles Date, ISO string, or number
+        const asDate = (v) => {
+            if (!v && v !== 0) return null;
+            if (v instanceof Date) return isNaN(v) ? null : v;
+            const d = new Date(v);
+            return isNaN(d) ? null : d;
+        };
+
+        // 1. fechaFinRef (UTC Excel date)
+        const fin = asDate(fila?.fechaFinRef);
+        if (fin) {
+            const h = formatHHMM(fin);
+            if (h && h !== '00:00') return h;
+        }
+
+        // 2. fechaInicioRef + duracionRef (UTC Excel date + ref duration)
+        const ini    = asDate(fila?.fechaInicioRef);
+        const durMin = parseDuracion(fila?.duracionRef);
+        if (ini && durMin !== null) {
+            const h = formatHHMM(new Date(ini.getTime() + durMin * 60000));
+            if (h && h !== '00:00') return h;
+        }
+
+        // 3. deberiaFinalizar = fechaInicioReal + duracionRef (local time, always present for executed rows)
+        const deb = asDate(fila?.deberiaFinalizar);
+        if (deb) {
+            // deberiaFinalizar uses local time (built from CSV dates with _local=true)
+            const pad = n => String(n).padStart(2, '0');
+            return `${pad(deb.getHours())}:${pad(deb.getMinutes())}`;
+        }
+
+        return null;
+    };
+
+    const buildTimeline = (filas) => {
+        // Build raw hito objects
+        const rawHitos = HITOS_CRITICOS.map(id => {
+            const fila      = filas.find(f => String(f.proceso).trim() === id);
+            const completado = !!(fila?.fechaInicioReal && fila?.fechaFinReal);
+            return {
+                id,
+                sqr:             fila?.sqr || null,
+                esFin:           id === HITO_FIN,
+                fila:            fila || null,
+                completado,
+                horaReal:        fila?.fechaFinReal ? formatHora(fila.fechaFinReal) : null,
+                horaRefEstimada: computeHoraRef(fila),
+                incremento:      fila?.incremento   ?? null,
+                onLine:          fila?.onLine       ? formatHora(fila.onLine)       : null
+            };
+        });
+
+        // Sort completed by fechaInicioReal ascending; pending stays in HITOS_CRITICOS order
+        const completadosArr = rawHitos
+            .filter(h => h.completado)
+            .sort((a, b) => new Date(a.fila.fechaInicioReal) - new Date(b.fila.fechaInicioReal));
+        const pendientesArr  = rawHitos.filter(h => !h.completado);
+        const hitos          = [...completadosArr, ...pendientesArr];
+        const separatorIdx   = completadosArr.length; // insert separator before this index
+
+        const pctCompletado = Math.round((completadosArr.length / hitos.length) * 100);
+
+        const ultimaFilaOnLine = [...filas].reverse().find(f => f.onLine);
+        const ultimoOnLine     = ultimaFilaOnLine ? formatHora(ultimaFilaOnLine.onLine) : '—';
+
+        const varAcum = completadosArr
+            .filter(h => h.incremento !== null)
+            .reduce((acc, h) => acc + h.incremento, 0);
+
+        return { hitos, separatorIdx, nCompletados: completadosArr.length, pctCompletado, ultimoOnLine, varAcum };
+    };
+
+    const renderTimeline = (filas) => {
+        const { hitos, separatorIdx, nCompletados, pctCompletado, ultimoOnLine, varAcum } = buildTimeline(filas);
+        const procesoActivo = [...filas].reverse().find(f => f.fechaInicioReal && f.fechaFinReal);
+
+        const varColor  = varAcum <= 0 ? '#059669' : '#DC2626';
+        const varSymbol = varAcum <= 0 ? '▼' : '▲';
+        const mono = `'SF Mono','Fira Code','JetBrains Mono','Roboto Mono',ui-monospace,monospace`;
+
+        const rows = [];
+
+        hitos.forEach((h, i) => {
+            // ── Separator ──────────────────────────────────────────
+            if (i === separatorIdx && separatorIdx > 0 && separatorIdx < hitos.length) {
+                rows.push(`
+                    <div style="display:flex;align-items:stretch;">
+                        <div style="width:52px;flex-shrink:0;"></div>
+                        <div style="width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;">
+                            <div style="width:3px;flex:1;background:#E2E8F0;"></div>
+                        </div>
+                        <div style="flex:1;display:flex;align-items:center;padding:2px 0 2px 14px;">
+                            <div style="flex:1;height:.5px;background:#E2E8F0;"></div>
+                            <span style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;padding:3px 10px;white-space:nowrap;border:.5px solid #E2E8F0;border-radius:20px;background:white;margin:0 8px;">Pendientes</span>
+                            <div style="flex:1;height:.5px;background:#E2E8F0;"></div>
+                        </div>
+                    </div>`);
+            }
+
+            const esProximo   = i === separatorIdx;
+            const esPendiente = i > separatorIdx;
+
+            // ── State config ────────────────────────────────────────
+            let accentColor, cardBg, cardBorderCSS, timeColor, badgeHTML, horaDisplay, horaLabel;
+            const refDisplay = h.horaRefEstimada || '—';
+
+            if (h.esFin && h.completado) {
+                accentColor  = '#059669'; cardBg = '#F0FDF4';
+                cardBorderCSS = `border:.5px solid #A7F3D0;border-left:3px solid #059669;`;
+                timeColor    = '#065F46'; horaDisplay = h.horaReal; horaLabel = 'Real';
+                badgeHTML    = `<span style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;background:#D1FAE5;color:#065F46;text-transform:uppercase;letter-spacing:.05em;">Fin del batch</span>`;
+            } else if (h.esFin && !h.completado) {
+                accentColor  = '#10B981'; cardBg = '#F0FDF4';
+                cardBorderCSS = `border:.5px solid #A7F3D0;border-left:3px solid #10B981;`;
+                timeColor    = '#059669'; horaDisplay = ultimoOnLine; horaLabel = 'Est.';
+                badgeHTML    = `<span style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;background:#D1FAE5;color:#065F46;text-transform:uppercase;letter-spacing:.05em;">Fin del batch</span>`;
+            } else if (h.completado) {
+                accentColor  = '#2563EB'; cardBg = 'white';
+                cardBorderCSS = `border:.5px solid #BFDBFE;border-left:3px solid #2563EB;`;
+                timeColor    = '#1E40AF'; horaDisplay = h.horaReal; horaLabel = 'Real';
+                badgeHTML    = `<span style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;background:#DBEAFE;color:#1E40AF;text-transform:uppercase;letter-spacing:.05em;">Completado</span>`;
+            } else if (esProximo) {
+                accentColor  = '#2563EB'; cardBg = '#EFF6FF';
+                cardBorderCSS = `border:.5px solid #93C5FD;border-left:3px solid #2563EB;`;
+                timeColor    = '#2563EB'; horaDisplay = h.onLine || ultimoOnLine || '—'; horaLabel = 'Est.';
+                badgeHTML    = `<span style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;background:#DBEAFE;color:#2563EB;text-transform:uppercase;letter-spacing:.05em;">En curso</span>`;
+            } else {
+                accentColor  = '#CBD5E1'; cardBg = '#F8FAFC';
+                cardBorderCSS = `border:.5px solid #E2E8F0;border-left:3px solid #CBD5E1;`;
+                timeColor    = '#94A3B8'; horaDisplay = h.onLine || ultimoOnLine || '—'; horaLabel = 'Proy.';
+                badgeHTML    = `<span style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;background:#F1F5F9;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;">Pendiente</span>`;
+            }
+
+            // ── Delta badge ─────────────────────────────────────────
+            let deltaHTML = '';
+            if (h.incremento !== null) {
+                const inc = h.incremento;
+                const dC = inc <= 0 ? '#059669' : '#DC2626';
+                const dB = inc <= 0 ? '#DCFCE7'  : '#FEE2E2';
+                const dS = inc <= 0 ? '▼' : '▲';
+                deltaHTML = `<span style="font-family:${mono};font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:${dB};color:${dC};white-space:nowrap;">${dS} ${minToHuman(inc)}</span>`;
+            } else if (esProximo) {
+                deltaHTML = `<span style="font-size:9.5px;padding:3px 8px;border-radius:6px;background:#DBEAFE;color:#2563EB;">en curso</span>`;
+            } else if (esPendiente) {
+                deltaHTML = `<span style="font-size:9.5px;padding:3px 8px;border-radius:6px;background:#F1F5F9;color:#94A3B8;">pendiente</span>`;
+            }
+
+            // ── Dot ─────────────────────────────────────────────────
+            const dotFill   = h.completado ? accentColor : 'white';
+            const dotBorder = h.completado ? accentColor : esProximo ? accentColor : h.esFin ? '#10B981' : '#D1D5DB';
+            const dotShadow = esProximo     ? `0 0 0 5px ${accentColor}25,0 2px 10px ${accentColor}35`
+                            : h.completado  ? `0 2px 8px ${accentColor}30`
+                            :                  'none';
+            const checkSVG  = h.completado
+                ? `<svg width="13" height="13" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+                : '';
+
+            // ── Lines ────────────────────────────────────────────────
+            const lineColorAbove = h.completado ? accentColor : '#E2E8F0';
+            const lineColorBelow = i === hitos.length - 1 ? 'transparent'
+                                 : hitos[i + 1]?.completado ? '#2563EB'
+                                 : '#E2E8F0';
+
+            const timeColDisplay = h.completado ? (h.horaReal || '') : (h.onLine || ultimoOnLine || '');
+            const sqrLabel = h.sqr
+                ? `<span style="font-size:11px;color:#94A3B8;font-weight:400;margin-left:5px;">${h.sqr}</span>`
+                : '';
+
+            rows.push(`
+                <div style="display:flex;align-items:stretch;">
+                    <!-- Time column -->
+                    <div style="width:52px;flex-shrink:0;text-align:right;padding-right:10px;padding-top:12px;">
+                        <span style="font-family:${mono};font-size:11.5px;font-weight:700;color:${h.completado ? accentColor : '#94A3B8'};letter-spacing:-.3px;line-height:1;">${timeColDisplay}</span>
+                    </div>
+
+                    <!-- Connector -->
+                    <div style="width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;">
+                        <div style="width:4px;height:10px;background:${lineColorAbove};flex-shrink:0;border-radius:2px 2px 0 0;"></div>
+                        <div style="width:32px;height:32px;border-radius:50%;background:${dotFill};border:3px solid ${dotBorder};box-shadow:${dotShadow};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${checkSVG}</div>
+                        <div style="width:4px;flex:1;background:${lineColorBelow};border-radius:0 0 2px 2px;"></div>
+                    </div>
+
+                    <!-- Card -->
+                    <div style="flex:1;padding-left:12px;padding-bottom:10px;">
+                        <div style="${cardBorderCSS}border-radius:10px;padding:10px 13px;background:${cardBg};${esPendiente ? 'opacity:.6;' : ''}">
+                            <!-- Header row -->
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <div style="font-size:13px;font-weight:700;color:${timeColor};">${h.id}${sqrLabel}</div>
+                                ${badgeHTML}
+                            </div>
+                            <!-- Time display: BIG monospace Real → Ref + delta -->
+                            <div style="display:flex;align-items:flex-end;gap:0;">
+                                <div>
+                                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:2px;">${horaLabel}</div>
+                                    <div style="font-family:${mono};font-size:22px;font-weight:800;color:${timeColor};line-height:1;letter-spacing:-1.5px;">${horaDisplay}</div>
+                                </div>
+                                <div style="padding:0 8px 3px;color:#D1D5DB;font-size:13px;">→</div>
+                                <div>
+                                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:2px;">Ref.</div>
+                                    <div style="font-family:${mono};font-size:22px;font-weight:400;color:#CBD5E1;line-height:1;letter-spacing:-1.5px;">${refDisplay}</div>
+                                </div>
+                                <div style="margin-left:auto;padding-bottom:2px;">${deltaHTML}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
+        });
+
+        const fechaLabel = new Date().toLocaleDateString('es-AR', {
+            weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+
+        return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+            <!-- Compact header: date + On Line -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #F1F5F9;">
+                <span style="font-size:11px;color:#94A3B8;">${fechaLabel}</span>
+                <div style="display:flex;align-items:baseline;gap:6px;">
+                    <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;">On Line</span>
+                    <span style="font-family:${mono};font-size:22px;font-weight:800;color:#1E40AF;letter-spacing:-1px;">${ultimoOnLine}</span>
+                </div>
+            </div>
+
+            <!-- Metrics strip (gap-grid layout) -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#E2E8F0;border-radius:10px;overflow:hidden;margin-bottom:14px;">
+                <div style="background:white;padding:9px 13px;">
+                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:3px;">Completados</div>
+                    <div style="font-size:16px;font-weight:700;color:#0F172A;line-height:1;">${nCompletados}<span style="font-size:11px;color:#CBD5E1;font-weight:400;"> /${hitos.length}</span></div>
+                </div>
+                <div style="background:white;padding:9px 13px;">
+                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:3px;">On Line</div>
+                    <div style="font-family:${mono};font-size:16px;font-weight:700;color:#1E40AF;letter-spacing:-.5px;line-height:1;">${ultimoOnLine}</div>
+                </div>
+                <div style="background:white;padding:9px 13px;">
+                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:3px;">Variación</div>
+                    <div style="font-family:${mono};font-size:16px;font-weight:700;color:${varColor};letter-spacing:-.5px;line-height:1;">${varSymbol} ${minToHuman(Math.abs(varAcum))}</div>
+                </div>
+                <div style="background:white;padding:9px 13px;">
+                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:3px;">Avance</div>
+                    <div style="font-size:16px;font-weight:700;color:#0F172A;line-height:1;">${pctCompletado}%</div>
+                    <div style="height:3px;background:#F1F5F9;border-radius:2px;margin-top:5px;"><div style="height:3px;background:#2563EB;border-radius:2px;width:${pctCompletado}%;"></div></div>
+                </div>
+            </div>
+
+            ${procesoActivo ? `
+            <div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:8px 13px;display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                <div style="width:6px;height:6px;border-radius:50%;background:#0EA5E9;flex-shrink:0;box-shadow:0 0 0 3px #BAE6FD;"></div>
+                <span style="font-size:11.5px;font-weight:600;color:#0369A1;">Último registrado — ${procesoActivo.sqr || procesoActivo.proceso}</span>
+                <span style="font-size:11px;color:#7DD3FC;margin-left:2px;">· Fin ${formatHora(procesoActivo.fechaFinReal)} · On Line ~${ultimoOnLine}</span>
+            </div>` : ''}
+
+            <!-- Hito list -->
+            <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#CBD5E1;margin-bottom:8px;padding-left:52px;">Hitos del camino crítico</div>
+            ${rows.join('')}
+        </div>`;
+    };
+
+    // ─────────────────────────────────────────────
+    //  Gantt helpers
+    // ─────────────────────────────────────────────
+    function horaAMinutos(fechaStr) {
+        if (!fechaStr) return null;
+        const d = new Date(fechaStr);
+        let min = d.getHours() * 60 + d.getMinutes();
+        if (d.getHours() < 12) min += 24 * 60;
+        return min;
+    }
+
+    function minutosAHora(min) {
+        const n = ((min % (24 * 60)) + 24 * 60) % (24 * 60);
+        const h = String(Math.floor(n / 60)).padStart(2, '0');
+        const m = String(n % 60).padStart(2, '0');
+        return h + ':' + m;
+    }
+
+    // Returns the ganttOffsetMin that shows the last executed row
+    function offsetDesdeUltimoEjecutado() {
+        if (!currentRows) return 0;
+        // Walk backwards to find last row with real data
+        for (let i = currentRows.length - 1; i >= 0; i--) {
+            const r = currentRows[i];
+            if (r.fechaInicioReal && r.fechaFinReal) {
+                return Math.max(0, horaAMinutos(r.fechaInicioReal) - 5);
+            }
+        }
+        // No executed rows — fall back to first row
+        const first = currentRows.find(r => r.fechaInicioReal);
+        return first ? Math.max(0, horaAMinutos(first.fechaInicioReal) - 5) : 0;
+    }
+
+    // Returns rows visible in the current window + pending up to proceso 99011
+    function prepararDatosGantt(filas, offsetMin) {
+        const ventanaFin = offsetMin + VENTANA_MINUTOS;
+
+        // Executed rows that overlap [offsetMin, ventanaFin]
+        const ejecutados = filas
+            .filter(f => f.fechaInicioReal && f.fechaFinReal)
+            .filter(f => {
+                const ini = horaAMinutos(f.fechaInicioReal);
+                const fin = horaAMinutos(f.fechaFinReal);
+                return ini !== null && fin !== null && ini < ventanaFin && fin > offsetMin;
+            });
+
+        // Pending rows: from after last executed, up to and including proceso 99011
+        let lastExecIdx = -1;
+        filas.forEach((f, i) => { if (f.fechaInicioReal && f.fechaFinReal) lastExecIdx = i; });
+        const releaseIdx = filas.findIndex(f => String(f.proceso).trim() === '99011');
+        const hasta = releaseIdx >= 0 ? releaseIdx + 1 : filas.length;
+        const pendientes = filas
+            .slice(lastExecIdx + 1, hasta)
+            .filter(f => !f.fechaInicioReal);
+
+        return [...ejecutados, ...pendientes].map(f => ({
+            ...f,
+            duracionRefMin: parseDuracion(f.duracionRef)
+        }));
+    }
+
+    function actualizarLabelVentana() {
+        const el = document.getElementById('ganttLabelVentana');
+        if (el) el.textContent =
+            minutosAHora(ganttOffsetMin) + ' — ' + minutosAHora(ganttOffsetMin + VENTANA_MINUTOS);
+    }
+
+    function renderGantt(filas) {
+        const visibles = prepararDatosGantt(filas, ganttOffsetMin);
+        const labels   = visibles.map(f => f.sqr || f.proceso);
+
+        actualizarLabelVentana();
+
+        // Dynamic height: 44px per row + 80px axes padding
+        const altura = Math.max(400, visibles.length * 44 + 80);
+        document.getElementById('ganttCanvasWrap').style.height = altura + 'px';
+
+        // "Ahora" line offset relative to window start
+        const ahora = new Date();
+        let ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
+        if (ahora.getHours() < 12) ahoraMin += 24 * 60;
+        const ahoraOffset = ahoraMin - ganttOffsetMin;
+
+        const datasets = [
+            {
+                // Invisible spacer to push each bar to its start position
+                label: 'offset',
+                data: visibles.map(f => {
+                    if (!f.fechaInicioReal) return 0;
+                    return Math.max(0, horaAMinutos(f.fechaInicioReal) - ganttOffsetMin);
+                }),
+                backgroundColor: 'rgba(0,0,0,0)',
+                borderWidth: 0,
+                barPercentage: 0.65,
+                categoryPercentage: 0.85
+            },
+            {
+                label: 'duración',
+                data: visibles.map(f => {
+                    if (!f.fechaInicioReal) return Math.max(f.duracionRefMin || 2, 3);
+                    const dur = horaAMinutos(f.fechaFinReal) - horaAMinutos(f.fechaInicioReal);
+                    return Math.max(dur, 3);
+                }),
+                backgroundColor: visibles.map(f => {
+                    if (!f.fechaInicioReal) return 'rgba(148,163,184,0.35)';
+                    if (String(f.estado).toUpperCase() === 'ERROR') return '#EF4444';
+                    if (f.incremento > 0) return '#F59E0B';
+                    return '#10B981';
+                }),
+                borderRadius: 4,
+                barPercentage: 0.65,
+                categoryPercentage: 0.85
+            }
+        ];
+
+        const ctx = document.getElementById('ganttChart').getContext('2d');
+        if (window.ganttInstance) window.ganttInstance.destroy();
+
+        window.ganttInstance = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: { padding: { bottom: 30, left: 10, right: 20 } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1E293B',
+                        titleColor: '#F8FAFC',
+                        bodyColor: '#CBD5E1',
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            title(items) {
+                                const f = visibles[items[0].dataIndex];
+                                return f.sqr || f.proceso;
+                            },
+                            label(ctx) {
+                                if (ctx.datasetIndex === 0) return null;
+                                const f = visibles[ctx.dataIndex];
+                                if (!f.fechaInicioReal) return 'Proyección — ' + (f.duracionRef || '—');
+                                const durMin = horaAMinutos(f.fechaFinReal) - horaAMinutos(f.fechaInicioReal);
+                                return [
+                                    'Inicio: '   + minutosAHora(horaAMinutos(f.fechaInicioReal)),
+                                    'Fin: '      + minutosAHora(horaAMinutos(f.fechaFinReal)),
+                                    'Duración: ' + Math.round(durMin) + ' min',
+                                    'Estado: '   + f.estado,
+                                    f.incremento > 0 ? '▲ +' + Math.round(f.incremento) + ' min vs referencia' :
+                                    f.incremento < 0 ? '▼ '  + Math.round(f.incremento) + ' min vs referencia' : ''
+                                ].filter(Boolean);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        min: 0,
+                        max: VENTANA_MINUTOS,
+                        ticks: {
+                            callback: v => minutosAHora(v + ganttOffsetMin),
+                            font: { size: 11 },
+                            color: '#94A3B8',
+                            maxTicksLimit: 10
+                        },
+                        grid: { color: 'rgba(0,0,0,0.04)' },
+                        border: { display: false }
+                    },
+                    y: {
+                        stacked: true,
+                        ticks: { font: { size: 11 }, color: '#475569' },
+                        grid: { display: false },
+                        border: { display: false }
+                    }
+                }
+            },
+            plugins: [{
+                id: 'lineaAhora',
+                afterDraw(chart) {
+                    if (ahoraOffset < 0 || ahoraOffset > VENTANA_MINUTOS) return;
+                    const { ctx, scales: { x: xAxis, y: yAxis } } = chart;
+                    const xPx = xAxis.getPixelForValue(ahoraOffset);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(xPx, yAxis.top);
+                    ctx.lineTo(xPx, yAxis.bottom);
+                    ctx.strokeStyle = '#3B82F6';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 3]);
+                    ctx.stroke();
+                    ctx.fillStyle = '#3B82F6';
+                    ctx.font = '11px Inter, Arial, sans-serif';
+                    ctx.fillText('Ahora', xPx + 4, yAxis.top + 12);
+                    ctx.restore();
+                }
+            }]
+        });
+    }
+
+    function abrirTimeline() {
+        if (!currentRows) return;
+        document.getElementById('timelineContenido').innerHTML = renderTimeline(currentRows);
+        document.getElementById('timelineOverlay').style.display = 'flex';
+    }
+
+    function cerrarTimeline() {
+        document.getElementById('timelineOverlay').style.display = 'none';
+    }
+
+    function abrirGantt() {
+        if (!currentRows) return;
+        // Open window at the first executed row's time (avoids the clock
+        // vs. batch-time mismatch — overnight batches map to 1440+ min
+        // while daytime clock is only ~700 min)
+        const firstExec = currentRows.find(r => r.fechaInicioReal && r.fechaFinReal);
+        if (firstExec) {
+            ganttOffsetMin = Math.max(0, horaAMinutos(firstExec.fechaInicioReal) - 5);
+        } else {
+            ganttOffsetMin = 0;
+        }
+
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        document.getElementById('ganttSubtitle').textContent =
+            `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} · ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        document.getElementById('ganttOverlay').classList.add('open');
+        renderGantt(currentRows);
+    }
+
+    function cerrarGantt() {
+        document.getElementById('ganttOverlay').classList.remove('open');
+    }
+
+    // ─────────────────────────────────────────────
+    //  Mail report helpers
+    // ─────────────────────────────────────────────
+    function obtenerFechaGuardia() {
+        // Use first real start date from the rows, or today
+        const row = currentRows && currentRows.find(r => r.fechaInicioReal);
+        const d = row ? new Date(row.fechaInicioReal) : new Date();
+        const pad = n => String(n).padStart(2, '0');
+        return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
+    }
+
+    function obtenerTipoDia() {
+        const row = currentRows && currentRows.find(r => r.fechaInicioReal);
+        const d = row ? new Date(row.fechaInicioReal) : new Date();
+        const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+        const nombre = dias[d.getDay()];
+        const esFinDeSemana = d.getDay() === 0 || d.getDay() === 6;
+        return nombre + (esFinDeSemana ? ' (No hábil)' : ' (Hábil)');
+    }
+
+    function obtenerOnLineActual() {
+        // Last row that has a real onLine date
+        if (!currentRows) return '—';
+        const conOnLine = currentRows.filter(r => r.onLine);
+        if (!conOnLine.length) return '—';
+        const last = conOnLine[conOnLine.length - 1];
+        return formatTimeOnly(last.onLine);
+    }
+
+    function generarHTMLInforme() {
+        const umbral = parseInt((document.getElementById('umbralMin') || {}).value || '5', 10) || 0;
+        const filas  = currentRows || [];
+
+        const demorados  = filas.filter(f => f.incremento >  umbral && f.fechaInicioReal);
+        const masRapidos = filas.filter(f => f.incremento < -umbral && f.fechaInicioReal);
+        const totalDemoraMin   = demorados.reduce((a, f) => a + f.incremento, 0);
+        const totalGananciaMin = masRapidos.reduce((a, f) => a + Math.abs(f.incremento), 0);
+
+        const s = v => (v == null ? '—' : String(v));
+
+        // ── Shared token sets ───────────────────────────────
+        const FONT = 'font-family:Arial,Helvetica,sans-serif;';
+        // th base
+        const TH = `${FONT}padding:6px 10px;font-size:10px;font-weight:600;text-transform:uppercase;`
+                 + `letter-spacing:0.07em;color:#94A3B8;border-bottom:1px solid #E2E8F0;`
+                 + `background:#F8FAFC;white-space:nowrap;`;
+        const TH_L = TH + 'text-align:left;';
+        const TH_R = TH + 'text-align:right;';
+        // td base
+        const TD = `${FONT}padding:7px 10px;font-size:12px;border-bottom:1px solid #F1F5F9;vertical-align:middle;`;
+        const TD_R = TD + 'text-align:right;';
+
+        function pctBadge(abs, ref, textColor, bgColor) {
+            if (ref <= 0) return '<span style="color:#94A3B8;">—</span>';
+            const pct = ((abs / ref) * 100).toFixed(0);
+            return `<span style="${FONT}display:inline-block;padding:1px 6px;border-radius:20px;`
+                 + `font-size:10px;font-weight:600;background:${bgColor};color:${textColor};">${pct}%</span>`;
+        }
+
+        // ── Section label ────────────────────────────────────
+        function sectionLabel(text) {
+            return `<p style="${FONT}margin:0 0 6px;font-size:10px;font-weight:700;text-transform:uppercase;`
+                 + `letter-spacing:0.08em;color:#94A3B8;">${text}</p>`;
+        }
+
+        // ── Build one table (delayed or faster) ─────────────
+        function buildTabla({ rows, isDelay }) {
+            const accent     = isDelay ? '#EF4444' : '#10B981';
+            const textColor  = isDelay ? '#B91C1C' : '#15803D';
+            const badgeBg    = isDelay ? '#FEE2E2' : '#DCFCE7';
+            const totalBg    = isDelay ? '#FFF5F5' : '#F0FDF9';
+            const totalBorder= isDelay ? '#FEE2E2' : '#BBF7D0';
+            const arrow      = isDelay ? '&#9650;' : '&#9660;';
+            const sign       = isDelay ? '+' : '−';
+            const totalMin   = isDelay ? totalDemoraMin : totalGananciaMin;
+
+            const rowsHTML = rows.map(f => {
+                const ref = parseDuracion(f.duracionRef) || 0;
+                const abs = Math.abs(f.incremento);
+                return `<tr>
+                    <td style="${TD}border-left:3px solid ${accent};color:#475569;">${s(f.instancia)}</td>
+                    <td style="${TD}color:#475569;">${s(f.lote)}</td>
+                    <td style="${TD}font-weight:600;color:#0F172A;">${s(f.sqr || f.proceso)}</td>
+                    <td style="${TD_R}color:#64748B;font-variant-numeric:tabular-nums;">${s(f.duracionRef)}</td>
+                    <td style="${TD_R}color:#64748B;font-variant-numeric:tabular-nums;">${s(f.duracionReal)}</td>
+                    <td style="${TD_R}font-weight:700;color:${textColor};font-variant-numeric:tabular-nums;">${arrow} ${sign}${minToHHMM(abs)}</td>
+                    <td style="${TD_R}">${pctBadge(abs, ref, textColor, badgeBg)}</td>
+                </tr>`;
+            }).join('');
+
+            const totalRow = `<tr style="background:${totalBg};">
+                <td colspan="5" style="${FONT}padding:7px 10px;font-size:11px;font-weight:600;`
+                    + `color:${textColor};border-top:2px solid ${totalBorder};">`
+                    + `${isDelay ? 'Total demorado' : 'Total ganado'}</td>
+                <td style="${FONT}padding:7px 10px;text-align:right;font-size:13px;font-weight:700;`
+                    + `color:${textColor};border-top:2px solid ${totalBorder};font-variant-numeric:tabular-nums;">`
+                    + `${arrow} ${sign}${minToHHMM(totalMin)}</td>
+                <td style="${FONT}padding:7px 10px;border-top:2px solid ${totalBorder};"></td>
+            </tr>`;
+
+            return `<table cellpadding="0" cellspacing="0"
+                style="border-collapse:collapse;width:100%;max-width:580px;">
+                <tr>
+                    <th style="${TH_L}">Inst.</th>
+                    <th style="${TH_L}">Lote</th>
+                    <th style="${TH_L}">Proceso</th>
+                    <th style="${TH_R}">Ref.</th>
+                    <th style="${TH_R}">Real</th>
+                    <th style="${TH_R}">&#916;</th>
+                    <th style="${TH_R}">%</th>
+                </tr>
+                ${rowsHTML}
+                ${totalRow}
+            </table>`;
+        }
+
+        const partes = [];
+
+        if (demorados.length > 0) {
+            partes.push(sectionLabel(`Demorados &nbsp;·&nbsp; ${demorados.length} proceso${demorados.length > 1 ? 's' : ''}`)
+                + buildTabla({ rows: demorados, isDelay: true }));
+        }
+
+        if (masRapidos.length > 0) {
+            if (partes.length) partes.push('<div style="height:18px;"></div>');
+            partes.push(sectionLabel(`Más rápidos &nbsp;·&nbsp; ${masRapidos.length} proceso${masRapidos.length > 1 ? 's' : ''}`)
+                + buildTabla({ rows: masRapidos, isDelay: false }));
+        }
+
+        if (!partes.length) {
+            partes.push(`<p style="${FONT}color:#94A3B8;font-size:12px;margin:0;">`
+                + `Sin variaciones por encima del umbral (${umbral} min).</p>`);
+        }
+
+        return `<!DOCTYPE html><html><body style="${FONT}font-size:13px;color:#0F172A;margin:0;padding:0;">`
+            + partes.join('')
+            + `</body></html>`;
+    }
+
+    function copiarInforme() {
+        if (!currentRows) return;
+        const btn = document.getElementById('btnCopiarMail');
+        const html = generarHTMLInforme();
+        try {
+            const blob = new Blob([html], { type: 'text/html' });
+            navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]).then(() => {
+                btn.textContent = '✓ Copiado';
+                setTimeout(() => { btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar para mail'; }, 2000);
+            }).catch(() => abrirVentanaFallback(html));
+        } catch (e) {
+            abrirVentanaFallback(html);
+        }
+    }
+
+    function abrirVentanaFallback(html) {
+        const win = window.open('', '_blank');
+        if (!win) return;
+        win.document.write(html);
+        win.document.close();
+        alert('Tu navegador no soporta copiar HTML directo.\nSe abrió una ventana nueva — seleccioná todo (Ctrl+A) y copiá (Ctrl+C) para pegar en Outlook.');
     }
 
     // ─────────────────────────────────────────────
@@ -743,18 +1975,21 @@
     document.getElementById('inputComparativo').addEventListener('change', async function () {
         const file = this.files[0];
         if (!file) return;
+        archivoComparativoNombre = file.name;
         try {
             parsedComparativo = await parseComparativo(file);
             const sqrCount = parsedComparativo.filter(r => r.sqr).length;
             document.getElementById('statusComparativoText').textContent =
                 `${file.name} — ${parsedComparativo.length} procesos, ${sqrCount} SQR encontrados`;
             document.getElementById('statusComparativo').classList.add('visible');
+            document.getElementById('cardComparativo').classList.add('loaded');
             updateSubtitle();
         } catch (err) {
             parsedComparativo = null;
             document.getElementById('statusComparativoText').textContent = '⚠ ' + err.message;
             document.getElementById('statusComparativo').style.color = '#dc2626';
             document.getElementById('statusComparativo').classList.add('visible');
+            document.getElementById('cardComparativo').classList.remove('loaded');
         }
         updateButton();
     });
@@ -762,17 +1997,20 @@
     document.getElementById('inputProbatch').addEventListener('change', async function () {
         const file = this.files[0];
         if (!file) return;
+        archivoCsvNombre = file.name;
         try {
             parsedProbatch = await parseProBatch(file);
             document.getElementById('statusProbatchText').textContent =
                 `${file.name} — ${parsedProbatch.length} registros`;
             document.getElementById('statusProbatch').classList.add('visible');
+            document.getElementById('cardProbatch').classList.add('loaded');
             updateSubtitle();
         } catch (err) {
             parsedProbatch = null;
             document.getElementById('statusProbatchText').textContent = '⚠ ' + err.message;
             document.getElementById('statusProbatch').style.color = '#dc2626';
             document.getElementById('statusProbatch').classList.add('visible');
+            document.getElementById('cardProbatch').classList.remove('loaded');
         }
         updateButton();
     });
@@ -794,8 +2032,52 @@
         if (!parsedComparativo || !parsedProbatch) return;
         const resultado = generarCaminoCritico(parsedComparativo, parsedProbatch);
         renderTabla(resultado);
+        guardarSesion(resultado);
         document.getElementById('resultsContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+
+    // ─────────────────────────────────────────────
+    //  Nueva guardia button
+    // ─────────────────────────────────────────────
+    document.getElementById('btnNuevaGuardia').addEventListener('click', () => {
+        if (confirm('¿Seguro que querés iniciar una nueva guardia? Se borrarán los datos actuales.')) {
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+        }
+    });
+
+    // ─────────────────────────────────────────────
+    //  Gantt modal — close + navigation handlers
+    // ─────────────────────────────────────────────
+    document.getElementById('ganttCloseBtn').addEventListener('click', cerrarGantt);
+    document.getElementById('ganttOverlay').addEventListener('click', e => {
+        if (e.target === e.currentTarget) cerrarGantt();
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { cerrarGantt(); cerrarTimeline(); }
+    });
+    document.getElementById('timelineOverlay').addEventListener('click', e => {
+        if (e.target === e.currentTarget) cerrarTimeline();
+    });
+    document.getElementById('btnGanttAnterior').addEventListener('click', () => {
+        ganttOffsetMin = Math.max(0, ganttOffsetMin - VENTANA_MINUTOS);
+        renderGantt(currentRows);
+    });
+    document.getElementById('btnGanttSiguiente').addEventListener('click', () => {
+        ganttOffsetMin += VENTANA_MINUTOS;
+        renderGantt(currentRows);
+    });
+    document.getElementById('btnGanttAhora').addEventListener('click', () => {
+        // Jump to the last executed row (batch frontier), not the clock
+        ganttOffsetMin = offsetDesdeUltimoEjecutado();
+        renderGantt(currentRows);
+    });
+
+    // ─────────────────────────────────────────────
+    //  Init — restore session if available
+    // ─────────────────────────────────────────────
+    restaurarSesion();
     </script>
 </body>
 </html>
+
