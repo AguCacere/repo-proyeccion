@@ -1074,6 +1074,7 @@
                 proceso:         ref.proceso,
                 sqr:             ref.sqr,
                 duracionRef:     ref.duracionRef,
+                fechaInicioRef:  ref.fechaInicioRef,   // Excel planned start time
                 fechaFinRef:     ref.fechaFinRef,      // Excel planned finish time
                 faltaBatch:      ref.faltaBatch,
                 fechaInicioReal: real?.fechaInicio || null,
@@ -1297,6 +1298,29 @@
         return h > 0 ? `${sign}${h}h ${m}min` : `${sign}${m}min`;
     };
 
+    // Compute planned finish hour for a row — tries fechaFinRef first,
+    // then falls back to fechaInicioRef + duracionRef.
+    // Handles both Date objects (fresh data) and ISO strings (localStorage restore).
+    const computeHoraRef = (fila) => {
+        const toDate = (v) => {
+            if (!v) return null;
+            if (v instanceof Date) return isNaN(v) ? null : v;
+            const d = new Date(v);
+            return isNaN(d) ? null : d;
+        };
+        // fechaFinRef — UTC-based Excel date
+        const fin = toDate(fila?.fechaFinRef);
+        if (fin) return formatHHMM(fin);
+        // fallback: fechaInicioRef + duracionRef
+        const ini    = toDate(fila?.fechaInicioRef);
+        const durMin = parseDuracion(fila?.duracionRef);
+        if (ini && durMin !== null) {
+            const d = new Date(ini.getTime() + durMin * 60000);
+            return formatHHMM(d);
+        }
+        return null;
+    };
+
     const buildTimeline = (filas) => {
         // Build raw hito objects
         const rawHitos = HITOS_CRITICOS.map(id => {
@@ -1309,7 +1333,7 @@
                 fila:            fila || null,
                 completado,
                 horaReal:        fila?.fechaFinReal ? formatHora(fila.fechaFinReal) : null,
-                horaRefEstimada: fila?.fechaFinRef  ? formatHHMM(fila.fechaFinRef)  : null,
+                horaRefEstimada: computeHoraRef(fila),
                 incremento:      fila?.incremento   ?? null,
                 onLine:          fila?.onLine       ? formatHora(fila.onLine)       : null
             };
@@ -1513,15 +1537,12 @@
         });
 
         return `<div style="font-family:Arial,Helvetica,sans-serif;">
-            <!-- Header strip -->
+            <!-- Header strip: date + On Line only (modal header already has the title) -->
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:14px;border-bottom:.5px solid #E2E8F0;">
-                <div>
-                    <div style="font-size:14px;font-weight:600;color:#0F172A;">Línea de tiempo</div>
-                    <div style="font-size:11px;color:#64748B;margin-top:2px;">${fechaLabel}</div>
-                </div>
+                <div style="font-size:11px;color:#64748B;">${fechaLabel}</div>
                 <div style="text-align:right;">
                     <div style="font-size:9.5px;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;">On Line estimado</div>
-                    <div style="font-size:26px;font-weight:600;color:#1D4ED8;font-variant-numeric:tabular-nums;line-height:1.1;">${ultimoOnLine}</div>
+                    <div style="font-size:24px;font-weight:600;color:#1D4ED8;font-variant-numeric:tabular-nums;line-height:1.1;">${ultimoOnLine}</div>
                 </div>
             </div>
 
