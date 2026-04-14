@@ -470,6 +470,97 @@
             background: #DBEAFE;
             border-color: #93C5FD;
         }
+
+        /* ── Ver Gantt button ── */
+        .btn-ver-gantt {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            border-radius: 8px;
+            color: #2563EB;
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 150ms, border-color 150ms;
+            flex-shrink: 0;
+        }
+        .btn-ver-gantt:hover { background: #DBEAFE; border-color: #93C5FD; }
+
+        /* ── Gantt modal ── */
+        .gantt-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 200ms;
+            pointer-events: none;
+        }
+        .gantt-overlay.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+        .gantt-panel {
+            width: 95vw;
+            max-height: 90vh;
+            background: #fff;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            transform: translateY(12px);
+            transition: transform 200ms;
+        }
+        .gantt-overlay.open .gantt-panel { transform: translateY(0); }
+        .gantt-header {
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-shrink: 0;
+        }
+        .gantt-header-left h2 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 2px;
+        }
+        .gantt-header-left p { font-size: 0.8rem; color: #6B7280; }
+        .gantt-close-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #6B7280;
+            font-size: 1.1rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            line-height: 1;
+            transition: background 150ms;
+        }
+        .gantt-close-btn:hover { background: #F3F4F6; color: #111827; }
+        .gantt-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px 24px;
+        }
+        .gantt-legend {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            color: #475569;
+        }
+        .gantt-canvas-wrap { position: relative; }
     </style>
 </head>
 
@@ -593,8 +684,34 @@
         </div><!-- /.page-content -->
     </main>
 
+    <!-- Gantt modal -->
+    <div class="gantt-overlay" id="ganttOverlay">
+        <div class="gantt-panel">
+            <div class="gantt-header">
+                <div class="gantt-header-left">
+                    <h2>Gantt — Camino Crítico</h2>
+                    <p id="ganttSubtitle"></p>
+                </div>
+                <button class="gantt-close-btn" id="ganttCloseBtn">✕</button>
+            </div>
+            <div class="gantt-body">
+                <div class="gantt-legend">
+                    <span><span style="background:#10B981;width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>OK</span>
+                    <span><span style="background:#F59E0B;width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Demorado</span>
+                    <span><span style="background:#EF4444;width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Error</span>
+                    <span><span style="background:rgba(148,163,184,0.4);width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Proyección</span>
+                    <span><span style="background:#3B82F6;width:2px;height:12px;display:inline-block;margin-right:4px;vertical-align:middle;"></span>Ahora</span>
+                </div>
+                <div class="gantt-canvas-wrap" id="ganttCanvasWrap">
+                    <canvas id="ganttChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script>
     // ─────────────────────────────────────────────
     //  State
@@ -603,6 +720,7 @@
     let parsedProbatch           = null;
     let archivoComparativoNombre = null;
     let archivoCsvNombre         = null;
+    let currentRows              = null;
 
     const STORAGE_KEY = 'sqr_guardia_sesion';
 
@@ -936,6 +1054,7 @@
     //  Render table
     // ─────────────────────────────────────────────
     function renderTabla(rows) {
+        currentRows = rows;
         const container = document.getElementById('resultsContainer');
 
         const html = `
@@ -950,6 +1069,10 @@
                         <div class="results-panel-sub">${rows.length} procesos · ${rows.filter(r => r.encontrado).length} con datos reales · ${rows.filter(r => !r.encontrado).length} sin datos · Clic en fila para ver detalle</div>
                     </div>
                 </div>
+                <button class="btn-ver-gantt" id="btnVerGantt">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="14" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>
+                    Ver Gantt
+                </button>
             </div>
             <div class="table-scroll">
                 <table class="cc-table">
@@ -977,6 +1100,7 @@
         </div>`;
 
         container.innerHTML = html;
+        document.getElementById('btnVerGantt').addEventListener('click', abrirGantt);
     }
 
     function buildRow(row, idx) {
@@ -1074,6 +1198,174 @@
     }
 
     // ─────────────────────────────────────────────
+    //  Gantt helpers
+    // ─────────────────────────────────────────────
+    function prepararDatosGantt(filas) {
+        const ejecutados = filas.filter(f => f.fechaInicioReal && f.fechaFinReal);
+        const pendientes = filas.filter(f => !f.fechaInicioReal).slice(0, 10);
+        return [...ejecutados, ...pendientes].map(f => ({
+            ...f,
+            duracionRefMin: parseDuracion(f.duracionRef)
+        }));
+    }
+
+    function horaAMinutos(fechaStr) {
+        if (!fechaStr) return null;
+        const d = new Date(fechaStr);
+        let min = d.getHours() * 60 + d.getMinutes();
+        if (d.getHours() < 12) min += 24 * 60;
+        return min;
+    }
+
+    function minutosAHora(min) {
+        const n = ((min % (24 * 60)) + 24 * 60) % (24 * 60);
+        const h = String(Math.floor(n / 60)).padStart(2, '0');
+        const m = String(n % 60).padStart(2, '0');
+        return h + ':' + m;
+    }
+
+    function renderGantt(filas) {
+        const datos = prepararDatosGantt(filas);
+        const labels = datos.map(f => f.sqr || f.proceso);
+
+        const iniciosMin = datos
+            .filter(f => f.fechaInicioReal)
+            .map(f => horaAMinutos(f.fechaInicioReal));
+
+        const minX = iniciosMin.length ? Math.min(...iniciosMin) - 15 : 0;
+        const maxX = minX + 600;
+
+        // Altura dinámica
+        const altura = Math.max(400, datos.length * 36);
+        document.getElementById('ganttCanvasWrap').style.height = altura + 'px';
+
+        const datasets = [
+            {
+                label: 'offset',
+                data: datos.map(f =>
+                    f.fechaInicioReal ? horaAMinutos(f.fechaInicioReal) - minX : 0
+                ),
+                backgroundColor: 'rgba(0,0,0,0)',
+                borderWidth: 0,
+                barPercentage: 0.6
+            },
+            {
+                label: 'duración',
+                data: datos.map(f => {
+                    if (f.fechaInicioReal && f.fechaFinReal) {
+                        return horaAMinutos(f.fechaFinReal) - horaAMinutos(f.fechaInicioReal);
+                    }
+                    return f.duracionRefMin || 1;
+                }),
+                backgroundColor: datos.map(f => {
+                    if (!f.fechaInicioReal) return 'rgba(148,163,184,0.4)';
+                    if (String(f.estado).toUpperCase() === 'ERROR') return '#EF4444';
+                    if (f.incremento > 0) return '#F59E0B';
+                    return '#10B981';
+                }),
+                borderRadius: 3,
+                barPercentage: 0.6
+            }
+        ];
+
+        const ahora = new Date();
+        let ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
+        if (ahora.getHours() < 12) ahoraMin += 24 * 60;
+        const ahoraOffset = ahoraMin - minX;
+
+        const ctx = document.getElementById('ganttChart').getContext('2d');
+        if (window.ganttInstance) window.ganttInstance.destroy();
+
+        window.ganttInstance = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title(items) {
+                                const f = datos[items[0].dataIndex];
+                                return f.sqr || f.proceso;
+                            },
+                            label(ctx) {
+                                const f = datos[ctx.dataIndex];
+                                if (ctx.datasetIndex === 0) return null;
+                                if (!f.fechaInicioReal) return 'Proyección — Dur. ref: ' + (f.duracionRef || '—');
+                                return [
+                                    'Inicio: ' + minutosAHora(horaAMinutos(f.fechaInicioReal)),
+                                    'Fin:    ' + minutosAHora(horaAMinutos(f.fechaFinReal)),
+                                    'Estado: ' + f.estado,
+                                    f.incremento > 0 ? 'Incremento: +' + Math.round(f.incremento) + ' min' : ''
+                                ].filter(Boolean);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        min: 0,
+                        max: maxX - minX,
+                        ticks: {
+                            callback: v => minutosAHora(v + minX),
+                            font: { size: 11 },
+                            color: '#94A3B8',
+                            maxTicksLimit: 12
+                        },
+                        grid: { color: 'rgba(0,0,0,0.04)' },
+                        border: { display: false }
+                    },
+                    y: {
+                        stacked: true,
+                        ticks: { font: { size: 11 }, color: '#475569' },
+                        grid: { display: false },
+                        border: { display: false }
+                    }
+                }
+            },
+            plugins: [{
+                id: 'lineaAhora',
+                afterDraw(chart) {
+                    if (ahoraOffset < 0 || ahoraOffset > (maxX - minX)) return;
+                    const { ctx, scales: { x: xAxis, y: yAxis } } = chart;
+                    const xPx = xAxis.getPixelForValue(ahoraOffset);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(xPx, yAxis.top);
+                    ctx.lineTo(xPx, yAxis.bottom);
+                    ctx.strokeStyle = '#3B82F6';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 3]);
+                    ctx.stroke();
+                    ctx.fillStyle = '#3B82F6';
+                    ctx.font = '11px Inter, Arial, sans-serif';
+                    ctx.fillText('Ahora', xPx + 4, yAxis.top + 12);
+                    ctx.restore();
+                }
+            }]
+        });
+    }
+
+    function abrirGantt() {
+        if (!currentRows) return;
+        const overlay = document.getElementById('ganttOverlay');
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        document.getElementById('ganttSubtitle').textContent =
+            `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} · ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        overlay.classList.add('open');
+        renderGantt(currentRows);
+    }
+
+    function cerrarGantt() {
+        document.getElementById('ganttOverlay').classList.remove('open');
+    }
+
+    // ─────────────────────────────────────────────
     //  File input handlers
     // ─────────────────────────────────────────────
     function updateButton() {
@@ -1156,6 +1448,17 @@
             localStorage.removeItem(STORAGE_KEY);
             location.reload();
         }
+    });
+
+    // ─────────────────────────────────────────────
+    //  Gantt modal — close handlers
+    // ─────────────────────────────────────────────
+    document.getElementById('ganttCloseBtn').addEventListener('click', cerrarGantt);
+    document.getElementById('ganttOverlay').addEventListener('click', e => {
+        if (e.target === e.currentTarget) cerrarGantt();
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') cerrarGantt();
     });
 
     // ─────────────────────────────────────────────
