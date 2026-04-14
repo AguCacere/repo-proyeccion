@@ -1496,116 +1496,107 @@
 
     function generarHTMLInforme() {
         const umbral = parseInt((document.getElementById('umbralMin') || {}).value || '5', 10) || 0;
-        const filas = currentRows || [];
+        const filas  = currentRows || [];
+        const onLine = obtenerOnLineActual();
 
-        const fecha      = obtenerFechaGuardia();
-        const tipoDia    = obtenerTipoDia();
-        const horaActual = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        const onLine     = obtenerOnLineActual();
+        const demorados  = filas.filter(f => f.incremento >  umbral && f.fechaInicioReal);
+        const masRapidos = filas.filter(f => f.incremento < -umbral && f.fechaInicioReal);
+        const totalDemoraMin   = demorados.reduce((a, f) => a + f.incremento, 0);
+        const totalGananciaMin = masRapidos.reduce((a, f) => a + Math.abs(f.incremento), 0);
 
-        const demorados   = filas.filter(f => f.incremento > umbral  && f.fechaInicioReal);
-        const masRapidos  = filas.filter(f => f.incremento < -umbral && f.fechaInicioReal);
-        const totalDemoraMin    = demorados.reduce((a, f) => a + f.incremento, 0);
-        const totalGananciaMin  = masRapidos.reduce((a, f) => a + Math.abs(f.incremento), 0);
-        const diferenciaNetaMin = totalDemoraMin - totalGananciaMin;
+        const s = v => (v == null ? '—' : String(v));
 
-        const s = (v) => v == null ? '—' : String(v);
-        const pctBadge = (abs, ref, color, bg) =>
-            ref > 0
-                ? `<span style="background:${bg};color:${color};padding:2px 6px;border-radius:10px;font-size:11px;">${((abs/ref)*100).toFixed(1)}%</span>`
+        // Shared styles
+        const TH_L = 'padding:10px 12px;text-align:left;font-size:11px;font-weight:normal;color:#94A3B8;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #E2E8F0;background:#FAFAFA;';
+        const TH_R = TH_L.replace('text-align:left','text-align:right');
+
+        function pctBadge(abs, ref, color, bg) {
+            return ref > 0
+                ? `<span style="background:${bg};color:${color};padding:2px 8px;border-radius:10px;font-size:11px;">${((abs/ref)*100).toFixed(1)}%</span>`
                 : '—';
+        }
 
-        const thStyle  = 'text-align:left;font-size:11px;color:#94A3B8;font-weight:normal;padding:8px 10px;border-bottom:1px solid #E2E8F0;';
-        const thStyleR = thStyle.replace('left','right');
+        function buildTabla({ filas: rows, accentColor, borderColor, bgStripe, bgTotal, labelTotal, signo, totalMin }) {
+            const rowsHTML = rows.map(f => {
+                const ref = parseDuracion(f.duracionRef) || 0;
+                const abs = Math.abs(f.incremento);
+                const TD  = `padding:10px 12px;border-bottom:1px solid #F1F5F9;`;
+                return `<tr style="border-left:3px solid ${accentColor};">
+                    <td style="${TD}color:#64748B;">${s(f.instancia)}</td>
+                    <td style="${TD}color:#64748B;">${s(f.lote)}</td>
+                    <td style="${TD}font-weight:500;color:#0F172A;">${s(f.sqr || f.proceso)}</td>
+                    <td style="${TD}text-align:right;color:#64748B;">${s(f.duracionRef)}</td>
+                    <td style="${TD}text-align:right;color:#64748B;">${s(f.duracionReal)}</td>
+                    <td style="${TD}text-align:right;font-weight:500;color:${accentColor === '#EF4444' ? '#991B1B' : '#166534'};">${signo} ${minToHHMM(abs)}</td>
+                    <td style="${TD}text-align:right;">${pctBadge(abs, ref, accentColor === '#EF4444' ? '#991B1B' : '#166534', bgStripe)}</td>
+                </tr>`;
+            }).join('');
 
-        const filasDemoradosHTML = demorados.map((f, i) => {
-            const ref = parseDuracion(f.duracionRef) || 0;
-            return `<tr style="background:${i%2===0?'#fff':'#FFF5F5'};">
-                <td style="padding:8px 10px;border-bottom:1px solid #FEE2E2;color:#64748B;">${s(f.instancia)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #FEE2E2;color:#64748B;">${s(f.lote)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #FEE2E2;font-weight:500;">${s(f.sqr || f.proceso)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #FEE2E2;text-align:right;color:#64748B;">${s(f.duracionRef)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #FEE2E2;text-align:right;color:#64748B;">${s(f.duracionReal)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #FEE2E2;text-align:right;color:#991B1B;font-weight:500;">&#9650; +${minToHHMM(f.incremento)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #FEE2E2;text-align:right;">${pctBadge(f.incremento, ref, '#991B1B', '#FEE2E2')}</td>
+            const totalRow = `<tr style="background:${bgTotal};">
+                <td colspan="5" style="padding:10px 12px;font-size:12px;color:${accentColor === '#EF4444' ? '#991B1B' : '#166534'};font-weight:500;border-top:2px solid ${borderColor};">${labelTotal}</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:500;color:${accentColor === '#EF4444' ? '#991B1B' : '#166534'};border-top:2px solid ${borderColor};font-size:14px;">${signo} ${minToHHMM(totalMin)}</td>
+                <td style="padding:10px 12px;border-top:2px solid ${borderColor};"></td>
             </tr>`;
-        }).join('');
 
-        const filasRapidosHTML = masRapidos.map((f, i) => {
-            const ref = parseDuracion(f.duracionRef) || 0;
-            return `<tr style="background:${i%2===0?'#fff':'#F0FFF4'};">
-                <td style="padding:8px 10px;border-bottom:1px solid #DCFCE7;color:#64748B;">${s(f.instancia)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #DCFCE7;color:#64748B;">${s(f.lote)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #DCFCE7;font-weight:500;">${s(f.sqr || f.proceso)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #DCFCE7;text-align:right;color:#64748B;">${s(f.duracionRef)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #DCFCE7;text-align:right;color:#64748B;">${s(f.duracionReal)}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #DCFCE7;text-align:right;color:#166534;font-weight:500;">&#9660; -${minToHHMM(Math.abs(f.incremento))}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #DCFCE7;text-align:right;">${pctBadge(Math.abs(f.incremento), ref, '#166534', '#DCFCE7')}</td>
-            </tr>`;
-        }).join('');
+            return `<table width="100%" cellpadding="0" cellspacing="0"
+                style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;">
+                <tr>
+                    <th style="${TH_L}">Inst.</th>
+                    <th style="${TH_L}">Lote</th>
+                    <th style="${TH_L}">Proceso</th>
+                    <th style="${TH_R}">Referencia</th>
+                    <th style="${TH_R}">Real</th>
+                    <th style="${TH_R}">Diferencia</th>
+                    <th style="${TH_R}">%</th>
+                </tr>
+                ${rowsHTML}
+                ${totalRow}
+            </table>`;
+        }
 
         const tablaDemorados = demorados.length > 0 ? `
-            <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#94A3B8;margin:0 0 8px;">Procesos demorados (${demorados.length})</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:28px;">
-                <tr style="background:#F8FAFC;">
-                    <th style="${thStyle}">Inst.</th><th style="${thStyle}">Lote</th><th style="${thStyle}">Proceso</th>
-                    <th style="${thStyleR}">Ref.</th><th style="${thStyleR}">Real</th><th style="${thStyleR}">Diferencia</th><th style="${thStyleR}">%</th>
-                </tr>
-                ${filasDemoradosHTML}
-            </table>` : '';
+            <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#94A3B8;margin:0 0 8px;font-family:Arial,sans-serif;">Procesos demorados (${demorados.length})</p>
+            ${buildTabla({
+                filas:       demorados,
+                accentColor: '#EF4444',
+                borderColor: '#FEE2E2',
+                bgStripe:    '#FEE2E2',
+                bgTotal:     '#FEF2F2',
+                labelTotal:  'Total acumulado demorado',
+                signo:       '&#9650; +',
+                totalMin:    totalDemoraMin
+            })}` : '';
+
+        const onLineBlock = `
+            <div style="text-align:center;padding:16px;margin:20px 0;background:#EFF6FF;border-radius:8px;font-family:Arial,sans-serif;">
+                <p style="margin:0;font-size:11px;color:#1D4ED8;text-transform:uppercase;letter-spacing:0.05em;">On Line estimado</p>
+                <p style="margin:4px 0 0;font-size:28px;font-weight:bold;color:#1D4ED8;">${onLine}</p>
+            </div>`;
 
         const tablaRapidos = masRapidos.length > 0 ? `
-            <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#94A3B8;margin:0 0 8px;">Procesos más rápidos (${masRapidos.length})</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:28px;">
-                <tr style="background:#F8FAFC;">
-                    <th style="${thStyle}">Inst.</th><th style="${thStyle}">Lote</th><th style="${thStyle}">Proceso</th>
-                    <th style="${thStyleR}">Ref.</th><th style="${thStyleR}">Real</th><th style="${thStyleR}">Diferencia</th><th style="${thStyleR}">%</th>
-                </tr>
-                ${filasRapidosHTML}
-            </table>` : '';
+            <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#94A3B8;margin:0 0 8px;font-family:Arial,sans-serif;">Procesos más rápidos (${masRapidos.length})</p>
+            ${buildTabla({
+                filas:       masRapidos,
+                accentColor: '#10B981',
+                borderColor: '#DCFCE7',
+                bgStripe:    '#DCFCE7',
+                bgTotal:     '#F0FDF4',
+                labelTotal:  'Total acumulado más rápido',
+                signo:       '&#9660; -',
+                totalMin:    totalGananciaMin
+            })}` : '';
 
         const notaSinVariaciones = (!demorados.length && !masRapidos.length)
-            ? `<p style="color:#64748B;font-size:13px;text-align:center;padding:20px 0;">Sin variaciones significativas (umbral: ${umbral} min).</p>`
+            ? `<p style="color:#64748B;font-size:13px;text-align:center;padding:20px 0;font-family:Arial,sans-serif;">Sin variaciones significativas (umbral: ${umbral} min).</p>`
             : '';
 
         return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;font-size:13px;color:#1E293B;max-width:800px;margin:0 auto;padding:20px;">
-
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border-bottom:2px solid #E2E8F0;padding-bottom:16px;">
-            <tr>
-                <td><p style="margin:0;font-size:18px;font-weight:bold;color:#0F172A;">Informe de Guardia — Camino Crítico</p>
-                    <p style="margin:4px 0 0;font-size:13px;color:#64748B;">${fecha} &middot; ${tipoDia}</p></td>
-                <td align="right" style="vertical-align:bottom;"><p style="margin:0;font-size:13px;color:#64748B;">Generado a las ${horaActual}</p></td>
-            </tr>
-        </table>
-
-        <table width="100%" cellpadding="12" cellspacing="0" style="margin-bottom:28px;border-spacing:8px;">
-            <tr>
-                <td width="25%" style="background:#EFF6FF;border-radius:8px;text-align:center;padding:14px 8px;">
-                    <p style="margin:0;font-size:11px;color:#1D4ED8;text-transform:uppercase;letter-spacing:0.04em;">On Line estimado</p>
-                    <p style="margin:6px 0 0;font-size:24px;font-weight:bold;color:#1D4ED8;">${onLine}</p>
-                </td>
-                <td width="4%"></td>
-                <td width="25%" style="background:#FEF2F2;border-radius:8px;text-align:center;padding:14px 8px;">
-                    <p style="margin:0;font-size:11px;color:#991B1B;text-transform:uppercase;letter-spacing:0.04em;">Total demorado</p>
-                    <p style="margin:6px 0 0;font-size:24px;font-weight:bold;color:#991B1B;">+${minToHHMM(totalDemoraMin)}</p>
-                </td>
-                <td width="4%"></td>
-                <td width="25%" style="background:#F0FDF4;border-radius:8px;text-align:center;padding:14px 8px;">
-                    <p style="margin:0;font-size:11px;color:#166534;text-transform:uppercase;letter-spacing:0.04em;">Total ganado</p>
-                    <p style="margin:6px 0 0;font-size:24px;font-weight:bold;color:#166534;">-${minToHHMM(totalGananciaMin)}</p>
-                </td>
-                <td width="4%"></td>
-                <td width="25%" style="background:${diferenciaNetaMin > 0 ? '#FEF2F2' : '#F0FDF4'};border-radius:8px;text-align:center;padding:14px 8px;">
-                    <p style="margin:0;font-size:11px;color:${diferenciaNetaMin > 0 ? '#991B1B' : '#166534'};text-transform:uppercase;letter-spacing:0.04em;">Diferencia neta</p>
-                    <p style="margin:6px 0 0;font-size:24px;font-weight:bold;color:${diferenciaNetaMin > 0 ? '#991B1B' : '#166534'};">${diferenciaNetaMin > 0 ? '+' : ''}${minToHHMM(diferenciaNetaMin)}</p>
-                </td>
-            </tr>
-        </table>
-
-        ${tablaDemorados}
-        ${tablaRapidos}
-        ${notaSinVariaciones}
-
+            ${tablaDemorados}
+            ${demorados.length > 0 && masRapidos.length > 0 ? '<div style="height:24px;"></div>' : ''}
+            ${onLineBlock}
+            ${demorados.length > 0 && masRapidos.length > 0 ? '<div style="height:24px;"></div>' : ''}
+            ${tablaRapidos}
+            ${notaSinVariaciones}
         </body></html>`;
     }
 
