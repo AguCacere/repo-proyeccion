@@ -739,6 +739,17 @@
         </div>
     </div>
 
+    <!-- Timeline modal -->
+    <div id="timelineOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.45);z-index:999;align-items:center;justify-content:center;">
+        <div style="background:white;border-radius:16px;width:600px;max-height:90vh;overflow-y:auto;padding:28px;position:relative;z-index:1000;box-shadow:0 20px 60px rgba(0,0,0,0.18),0 4px 16px rgba(0,0,0,0.08);margin:0 20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <span style="font-size:15px;font-weight:600;color:#111827;">Línea de tiempo</span>
+                <button onclick="cerrarTimeline()" style="background:#F1F5F9;border:none;font-size:14px;cursor:pointer;color:#64748B;border-radius:8px;padding:6px 10px;line-height:1;transition:background 150ms;" onmouseover="this.style.background='#E2E8F0'" onmouseout="this.style.background='#F1F5F9'">✕</button>
+            </div>
+            <div id="timelineContenido"></div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -753,6 +764,9 @@
     let currentRows              = null;
     let ganttOffsetMin           = 0;
     const VENTANA_MINUTOS        = 60;
+
+    const HITOS_CRITICOS = ['80051', '4153', '27750', '7211', '99011'];
+    const HITO_FIN       = '99011';
 
     const STORAGE_KEY = 'sqr_guardia_sesion';
 
@@ -1121,6 +1135,10 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         Copiar para mail
                     </button>
+                    <button class="btn-ver-gantt" id="btnVerTimeline">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        Ver línea de tiempo
+                    </button>
                     <button class="btn-ver-gantt" id="btnVerGantt">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="14" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>
                         Ver Gantt
@@ -1154,6 +1172,7 @@
 
         container.innerHTML = html;
         document.getElementById('btnVerGantt').addEventListener('click', abrirGantt);
+        document.getElementById('btnVerTimeline').addEventListener('click', abrirTimeline);
         document.getElementById('btnCopiarMail').addEventListener('click', copiarInforme);
     }
 
@@ -1256,6 +1275,212 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
     }
+
+    // ─────────────────────────────────────────────
+    //  Timeline helpers
+    // ─────────────────────────────────────────────
+    const formatHora = (fechaStr) => {
+        if (!fechaStr) return '—';
+        const d = new Date(fechaStr);
+        if (isNaN(d)) return '—';
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    };
+
+    // Human-readable duration for timeline (e.g. "+1h 5min")
+    const minToHuman = (min) => {
+        if (min === null || min === undefined) return '—';
+        const sign = min < 0 ? '-' : '+';
+        const abs  = Math.abs(min);
+        const h    = Math.floor(abs / 60);
+        const m    = Math.round(abs % 60);
+        return h > 0 ? `${sign}${h}h ${m}min` : `${sign}${m}min`;
+    };
+
+    const buildTimeline = (filas) => {
+        const hitos = HITOS_CRITICOS.map(id => {
+            const fila = filas.find(f => String(f.proceso).trim() === id);
+            return {
+                id,
+                esFin:      id === HITO_FIN,
+                fila:       fila || null,
+                completado: !!(fila?.fechaInicioReal && fila?.fechaFinReal),
+                horaReal:   fila?.fechaFinReal  ? formatHora(fila.fechaFinReal)  : null,
+                horaRef:    fila?.duracionRef   ?? null,
+                incremento: fila?.incremento    ?? null,
+                onLine:     fila?.onLine        ? formatHora(fila.onLine)        : null
+            };
+        });
+
+        const proximoIdx    = hitos.findIndex(h => !h.completado);
+        const completados   = hitos.filter(h => h.completado).length;
+        const pctCompletado = Math.round((completados / hitos.length) * 100);
+
+        const ultimaFilaOnLine = [...filas].reverse().find(f => f.onLine);
+        const ultimoOnLine = ultimaFilaOnLine ? formatHora(ultimaFilaOnLine.onLine) : '—';
+
+        const varAcum = hitos
+            .filter(h => h.completado && h.incremento !== null)
+            .reduce((acc, h) => acc + h.incremento, 0);
+
+        return { hitos, proximoIdx, pctCompletado, ultimoOnLine, varAcum };
+    };
+
+    const renderTimeline = (filas) => {
+        const { hitos, proximoIdx, pctCompletado, ultimoOnLine, varAcum } = buildTimeline(filas);
+        const procesoActivo = [...filas].reverse().find(f => f.fechaInicioReal && f.fechaFinReal);
+
+        const varColor  = varAcum <= 0 ? '#065F46' : '#991B1B';
+        const varBg     = varAcum <= 0 ? '#ECFDF5' : '#FEF2F2';
+        const varSymbol = varAcum <= 0 ? '▼' : '▲';
+
+        const hitosHTML = hitos.map((h, i) => {
+            const esProximo  = i === proximoIdx;
+            const esPendiente = !h.completado && !esProximo;
+
+            let cardBorderLeft = '3px solid #E2E8F0';
+            let cardBg         = '#F8FAFC';
+            let badgeHTML      = '';
+            let horaHTML       = '';
+            let deltaHTML      = '';
+            let tiempoHTML     = '';
+
+            if (h.esFin) {
+                cardBorderLeft = '3px solid #10B981';
+                cardBg         = '#ECFDF5';
+                badgeHTML = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#D1FAE5;color:#065F46;">Fin del batch</span>`;
+                horaHTML  = `<div style="display:flex;gap:20px;">
+                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">On Line est.</div>
+                    <div style="font-size:15px;font-weight:500;color:#065F46;">${ultimoOnLine}</div></div>
+                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Referencia</div>
+                    <div style="font-size:15px;font-weight:500;color:#64748B;">${h.horaRef || '—'}</div></div>
+                </div>`;
+                deltaHTML  = `<span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:8px;background:#D1FAE5;color:#065F46;">último proceso del batch</span>`;
+                tiempoHTML = `<span style="font-size:11px;color:#64748B;">relese.sh</span>`;
+
+            } else if (h.completado) {
+                cardBorderLeft = '3px solid #3B82F6';
+                cardBg         = 'white';
+                badgeHTML = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#DBEAFE;color:#1D4ED8;">Completado</span>`;
+                const deltaBg     = (h.incremento ?? 0) <= 0 ? '#DCFCE7' : '#FEE2E2';
+                const deltaColor  = (h.incremento ?? 0) <= 0 ? '#166534' : '#991B1B';
+                const deltaSymbol = (h.incremento ?? 0) <= 0 ? '▼' : '▲';
+                horaHTML  = `<div style="display:flex;gap:20px;">
+                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Real</div>
+                    <div style="font-size:15px;font-weight:500;color:#0F172A;">${h.horaReal}</div></div>
+                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Referencia</div>
+                    <div style="font-size:15px;font-weight:500;color:#64748B;">${h.horaRef || '—'}</div></div>
+                </div>`;
+                deltaHTML  = `<span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:8px;background:${deltaBg};color:${deltaColor};">${deltaSymbol} ${minToHuman(h.incremento)} vs ref.</span>`;
+                tiempoHTML = `<span style="font-size:11px;color:#64748B;">completado</span>`;
+
+            } else if (esProximo) {
+                cardBorderLeft = '3px solid #3B82F6';
+                cardBg         = '#EFF6FF';
+                badgeHTML = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#DBEAFE;color:#1D4ED8;">Próximo hito</span>`;
+                horaHTML  = `<div style="display:flex;gap:20px;">
+                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Estimado</div>
+                    <div style="font-size:15px;font-weight:500;color:#1D4ED8;">${h.onLine || '—'}</div></div>
+                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Referencia</div>
+                    <div style="font-size:15px;font-weight:500;color:#64748B;">${h.horaRef || '—'}</div></div>
+                </div>`;
+                deltaHTML  = `<span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:8px;background:#DBEAFE;color:#1D4ED8;">en curso</span>`;
+                tiempoHTML = `<span style="font-size:11px;color:#3B82F6;">On Line ~${ultimoOnLine}</span>`;
+
+            } else {
+                badgeHTML = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#F1F5F9;color:#64748B;">Pendiente</span>`;
+                horaHTML  = `<div style="display:flex;gap:20px;opacity:.6;">
+                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Proyección</div>
+                    <div style="font-size:15px;font-weight:500;color:#64748B;">${h.onLine || '—'}</div></div>
+                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Referencia</div>
+                    <div style="font-size:15px;font-weight:500;color:#64748B;">${h.horaRef || '—'}</div></div>
+                </div>`;
+                deltaHTML  = `<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:#F1F5F9;color:#64748B;">pendiente</span>`;
+                tiempoHTML = `<span style="font-size:11px;color:#64748B;">On Line ~${ultimoOnLine}</span>`;
+            }
+
+            const dotFill   = h.completado ? '#3B82F6' : 'white';
+            const dotBorder = h.completado ? '#3B82F6' : esProximo ? '#3B82F6' : h.esFin ? '#10B981' : '#CBD5E1';
+            const dotShadow = esProximo ? '0 0 0 4px #DBEAFE' : h.esFin && !h.completado ? '0 0 0 4px #D1FAE5' : 'none';
+            const checkHTML = h.completado
+                ? `<div style="width:7px;height:7px;border-right:2px solid white;border-bottom:2px solid white;transform:rotate(45deg) translate(-1px,-1px);"></div>`
+                : '';
+
+            const lineColorAbove = i === 0 ? (h.completado ? '#3B82F6' : '#E2E8F0') : null;
+            const lineColorBelow = i < hitos.length - 1
+                ? (hitos[i + 1]?.completado ? '#3B82F6' : '#E2E8F0')
+                : null;
+
+            return `<div style="display:flex;align-items:flex-start;gap:0;">
+                <div style="display:flex;flex-direction:column;align-items:center;width:48px;flex-shrink:0;">
+                    ${lineColorAbove !== null ? `<div style="width:2px;height:12px;background:${lineColorAbove};"></div>` : ''}
+                    <div style="width:22px;height:22px;border-radius:50%;background:${dotFill};border:3px solid ${dotBorder};box-shadow:${dotShadow};display:flex;align-items:center;justify-content:center;z-index:1;flex-shrink:0;">${checkHTML}</div>
+                    ${lineColorBelow !== null ? `<div style="width:2px;flex:1;min-height:24px;background:${lineColorBelow};"></div>` : ''}
+                </div>
+                <div style="flex:1;background:${cardBg};border:.5px solid #E2E8F0;border-left:${cardBorderLeft};border-radius:10px;padding:12px 14px;margin-bottom:12px;margin-left:16px;${esPendiente ? 'opacity:.75;' : ''}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <span style="font-size:14px;font-weight:500;color:${h.esFin ? '#065F46' : esProximo ? '#1D4ED8' : '#0F172A'};">${h.id}${h.esFin ? ' — relese.sh' : ''}</span>
+                        ${badgeHTML}
+                    </div>
+                    ${horaHTML}
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:.5px solid #E2E8F0;">
+                        ${deltaHTML}
+                        ${tiempoHTML}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        const fechaLabel = new Date().toLocaleDateString('es-AR', {
+            weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+
+        const procesoActivoHTML = procesoActivo ? `
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#3B82F6;flex-shrink:0;"></div>
+                <div>
+                    <div style="font-size:12px;font-weight:500;color:#1D4ED8;">Último proceso registrado — ${procesoActivo.sqr || procesoActivo.proceso}</div>
+                    <div style="font-size:11px;color:#3B82F6;margin-top:2px;">Lote ${procesoActivo.lote} · Fin ${formatHora(procesoActivo.fechaFinReal)} · On Line estimado ${ultimoOnLine}</div>
+                </div>
+            </div>` : '';
+
+        return `<div style="font-family:Arial,Helvetica,sans-serif;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:16px;border-bottom:.5px solid #E2E8F0;">
+                <div>
+                    <div style="font-size:15px;font-weight:500;color:#0F172A;">Línea de tiempo — Camino Crítico</div>
+                    <div style="font-size:12px;color:#64748B;margin-top:3px;">${fechaLabel}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.05em;">On Line estimado</div>
+                    <div style="font-size:28px;font-weight:500;color:#1D4ED8;">${ultimoOnLine}</div>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);border:.5px solid #E2E8F0;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+                <div style="padding:12px 16px;border-right:.5px solid #E2E8F0;">
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748B;margin-bottom:4px;">Hitos completados</div>
+                    <div style="font-size:18px;font-weight:500;color:#0F172A;">${hitos.filter(h=>h.completado).length}<span style="font-size:13px;color:#64748B;font-weight:400;"> / ${hitos.length}</span></div>
+                </div>
+                <div style="padding:12px 16px;border-right:.5px solid #E2E8F0;">
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748B;margin-bottom:4px;">On Line</div>
+                    <div style="font-size:18px;font-weight:500;color:#1D4ED8;">${ultimoOnLine}</div>
+                </div>
+                <div style="padding:12px 16px;border-right:.5px solid #E2E8F0;">
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748B;margin-bottom:4px;">Variación acumulada</div>
+                    <div style="font-size:18px;font-weight:500;color:${varColor};">${varSymbol} ${minToHuman(Math.abs(varAcum))}</div>
+                </div>
+                <div style="padding:12px 16px;">
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748B;margin-bottom:4px;">Avance</div>
+                    <div style="font-size:18px;font-weight:500;color:#0F172A;">${pctCompletado}%</div>
+                    <div style="height:4px;background:#E2E8F0;border-radius:2px;margin-top:6px;"><div style="height:4px;background:#3B82F6;border-radius:2px;width:${pctCompletado}%;"></div></div>
+                </div>
+            </div>
+
+            ${procesoActivoHTML}
+
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:14px;">Hitos del camino crítico</div>
+            ${hitosHTML}
+        </div>`;
+    };
 
     // ─────────────────────────────────────────────
     //  Gantt helpers
@@ -1456,6 +1681,16 @@
                 }
             }]
         });
+    }
+
+    function abrirTimeline() {
+        if (!currentRows) return;
+        document.getElementById('timelineContenido').innerHTML = renderTimeline(currentRows);
+        document.getElementById('timelineOverlay').style.display = 'flex';
+    }
+
+    function cerrarTimeline() {
+        document.getElementById('timelineOverlay').style.display = 'none';
     }
 
     function abrirGantt() {
@@ -1741,7 +1976,10 @@
         if (e.target === e.currentTarget) cerrarGantt();
     });
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') cerrarGantt();
+        if (e.key === 'Escape') { cerrarGantt(); cerrarTimeline(); }
+    });
+    document.getElementById('timelineOverlay').addEventListener('click', e => {
+        if (e.target === e.currentTarget) cerrarTimeline();
     });
     document.getElementById('btnGanttAnterior').addEventListener('click', () => {
         ganttOffsetMin = Math.max(0, ganttOffsetMin - VENTANA_MINUTOS);
