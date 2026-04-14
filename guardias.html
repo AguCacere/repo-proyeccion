@@ -1497,7 +1497,6 @@
     function generarHTMLInforme() {
         const umbral = parseInt((document.getElementById('umbralMin') || {}).value || '5', 10) || 0;
         const filas  = currentRows || [];
-        const onLine = obtenerOnLineActual();
 
         const demorados  = filas.filter(f => f.incremento >  umbral && f.fechaInicioReal);
         const masRapidos = filas.filter(f => f.incremento < -umbral && f.fechaInicioReal);
@@ -1506,47 +1505,75 @@
 
         const s = v => (v == null ? '—' : String(v));
 
-        // Shared styles
-        const TH_L = 'padding:10px 12px;text-align:left;font-size:11px;font-weight:normal;color:#94A3B8;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #E2E8F0;background:#FAFAFA;';
-        const TH_R = TH_L.replace('text-align:left','text-align:right');
+        // ── Shared token sets ───────────────────────────────
+        const FONT = 'font-family:Arial,Helvetica,sans-serif;';
+        // th base
+        const TH = `${FONT}padding:6px 10px;font-size:10px;font-weight:600;text-transform:uppercase;`
+                 + `letter-spacing:0.07em;color:#94A3B8;border-bottom:1px solid #E2E8F0;`
+                 + `background:#F8FAFC;white-space:nowrap;`;
+        const TH_L = TH + 'text-align:left;';
+        const TH_R = TH + 'text-align:right;';
+        // td base
+        const TD = `${FONT}padding:7px 10px;font-size:12px;border-bottom:1px solid #F1F5F9;vertical-align:middle;`;
+        const TD_R = TD + 'text-align:right;';
 
-        function pctBadge(abs, ref, color, bg) {
-            return ref > 0
-                ? `<span style="background:${bg};color:${color};padding:2px 8px;border-radius:10px;font-size:11px;">${((abs/ref)*100).toFixed(1)}%</span>`
-                : '—';
+        function pctBadge(abs, ref, textColor, bgColor) {
+            if (ref <= 0) return '<span style="color:#94A3B8;">—</span>';
+            const pct = ((abs / ref) * 100).toFixed(0);
+            return `<span style="${FONT}display:inline-block;padding:1px 6px;border-radius:20px;`
+                 + `font-size:10px;font-weight:600;background:${bgColor};color:${textColor};">${pct}%</span>`;
         }
 
-        function buildTabla({ filas: rows, accentColor, borderColor, bgStripe, bgTotal, labelTotal, signo, totalMin }) {
+        // ── Section label ────────────────────────────────────
+        function sectionLabel(text) {
+            return `<p style="${FONT}margin:0 0 6px;font-size:10px;font-weight:700;text-transform:uppercase;`
+                 + `letter-spacing:0.08em;color:#94A3B8;">${text}</p>`;
+        }
+
+        // ── Build one table (delayed or faster) ─────────────
+        function buildTabla({ rows, isDelay }) {
+            const accent     = isDelay ? '#EF4444' : '#10B981';
+            const textColor  = isDelay ? '#B91C1C' : '#15803D';
+            const badgeBg    = isDelay ? '#FEE2E2' : '#DCFCE7';
+            const totalBg    = isDelay ? '#FFF5F5' : '#F0FDF9';
+            const totalBorder= isDelay ? '#FEE2E2' : '#BBF7D0';
+            const arrow      = isDelay ? '&#9650;' : '&#9660;';
+            const sign       = isDelay ? '+' : '−';
+            const totalMin   = isDelay ? totalDemoraMin : totalGananciaMin;
+
             const rowsHTML = rows.map(f => {
                 const ref = parseDuracion(f.duracionRef) || 0;
                 const abs = Math.abs(f.incremento);
-                const TD  = `padding:10px 12px;border-bottom:1px solid #F1F5F9;`;
-                return `<tr style="border-left:3px solid ${accentColor};">
-                    <td style="${TD}color:#64748B;">${s(f.instancia)}</td>
-                    <td style="${TD}color:#64748B;">${s(f.lote)}</td>
-                    <td style="${TD}font-weight:500;color:#0F172A;">${s(f.sqr || f.proceso)}</td>
-                    <td style="${TD}text-align:right;color:#64748B;">${s(f.duracionRef)}</td>
-                    <td style="${TD}text-align:right;color:#64748B;">${s(f.duracionReal)}</td>
-                    <td style="${TD}text-align:right;font-weight:500;color:${accentColor === '#EF4444' ? '#991B1B' : '#166534'};">${signo} ${minToHHMM(abs)}</td>
-                    <td style="${TD}text-align:right;">${pctBadge(abs, ref, accentColor === '#EF4444' ? '#991B1B' : '#166534', bgStripe)}</td>
+                return `<tr>
+                    <td style="${TD}border-left:3px solid ${accent};color:#475569;">${s(f.instancia)}</td>
+                    <td style="${TD}color:#475569;">${s(f.lote)}</td>
+                    <td style="${TD}font-weight:600;color:#0F172A;">${s(f.sqr || f.proceso)}</td>
+                    <td style="${TD_R}color:#64748B;font-variant-numeric:tabular-nums;">${s(f.duracionRef)}</td>
+                    <td style="${TD_R}color:#64748B;font-variant-numeric:tabular-nums;">${s(f.duracionReal)}</td>
+                    <td style="${TD_R}font-weight:700;color:${textColor};font-variant-numeric:tabular-nums;">${arrow} ${sign}${minToHHMM(abs)}</td>
+                    <td style="${TD_R}">${pctBadge(abs, ref, textColor, badgeBg)}</td>
                 </tr>`;
             }).join('');
 
-            const totalRow = `<tr style="background:${bgTotal};">
-                <td colspan="5" style="padding:10px 12px;font-size:12px;color:${accentColor === '#EF4444' ? '#991B1B' : '#166534'};font-weight:500;border-top:2px solid ${borderColor};">${labelTotal}</td>
-                <td style="padding:10px 12px;text-align:right;font-weight:500;color:${accentColor === '#EF4444' ? '#991B1B' : '#166534'};border-top:2px solid ${borderColor};font-size:14px;">${signo} ${minToHHMM(totalMin)}</td>
-                <td style="padding:10px 12px;border-top:2px solid ${borderColor};"></td>
+            const totalRow = `<tr style="background:${totalBg};">
+                <td colspan="5" style="${FONT}padding:7px 10px;font-size:11px;font-weight:600;`
+                    + `color:${textColor};border-top:2px solid ${totalBorder};">`
+                    + `${isDelay ? 'Total demorado' : 'Total ganado'}</td>
+                <td style="${FONT}padding:7px 10px;text-align:right;font-size:13px;font-weight:700;`
+                    + `color:${textColor};border-top:2px solid ${totalBorder};font-variant-numeric:tabular-nums;">`
+                    + `${arrow} ${sign}${minToHHMM(totalMin)}</td>
+                <td style="${FONT}padding:7px 10px;border-top:2px solid ${totalBorder};"></td>
             </tr>`;
 
-            return `<table width="100%" cellpadding="0" cellspacing="0"
-                style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;">
+            return `<table cellpadding="0" cellspacing="0"
+                style="border-collapse:collapse;width:100%;max-width:580px;">
                 <tr>
                     <th style="${TH_L}">Inst.</th>
                     <th style="${TH_L}">Lote</th>
                     <th style="${TH_L}">Proceso</th>
-                    <th style="${TH_R}">Referencia</th>
+                    <th style="${TH_R}">Ref.</th>
                     <th style="${TH_R}">Real</th>
-                    <th style="${TH_R}">Diferencia</th>
+                    <th style="${TH_R}">&#916;</th>
                     <th style="${TH_R}">%</th>
                 </tr>
                 ${rowsHTML}
@@ -1554,50 +1581,27 @@
             </table>`;
         }
 
-        const tablaDemorados = demorados.length > 0 ? `
-            <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#94A3B8;margin:0 0 8px;font-family:Arial,sans-serif;">Procesos demorados (${demorados.length})</p>
-            ${buildTabla({
-                filas:       demorados,
-                accentColor: '#EF4444',
-                borderColor: '#FEE2E2',
-                bgStripe:    '#FEE2E2',
-                bgTotal:     '#FEF2F2',
-                labelTotal:  'Total acumulado demorado',
-                signo:       '&#9650; +',
-                totalMin:    totalDemoraMin
-            })}` : '';
+        const partes = [];
 
-        const onLineBlock = `
-            <div style="text-align:center;padding:16px;margin:20px 0;background:#EFF6FF;border-radius:8px;font-family:Arial,sans-serif;">
-                <p style="margin:0;font-size:11px;color:#1D4ED8;text-transform:uppercase;letter-spacing:0.05em;">On Line estimado</p>
-                <p style="margin:4px 0 0;font-size:28px;font-weight:bold;color:#1D4ED8;">${onLine}</p>
-            </div>`;
+        if (demorados.length > 0) {
+            partes.push(sectionLabel(`Demorados &nbsp;·&nbsp; ${demorados.length} proceso${demorados.length > 1 ? 's' : ''}`)
+                + buildTabla({ rows: demorados, isDelay: true }));
+        }
 
-        const tablaRapidos = masRapidos.length > 0 ? `
-            <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#94A3B8;margin:0 0 8px;font-family:Arial,sans-serif;">Procesos más rápidos (${masRapidos.length})</p>
-            ${buildTabla({
-                filas:       masRapidos,
-                accentColor: '#10B981',
-                borderColor: '#DCFCE7',
-                bgStripe:    '#DCFCE7',
-                bgTotal:     '#F0FDF4',
-                labelTotal:  'Total acumulado más rápido',
-                signo:       '&#9660; -',
-                totalMin:    totalGananciaMin
-            })}` : '';
+        if (masRapidos.length > 0) {
+            if (partes.length) partes.push('<div style="height:18px;"></div>');
+            partes.push(sectionLabel(`Más rápidos &nbsp;·&nbsp; ${masRapidos.length} proceso${masRapidos.length > 1 ? 's' : ''}`)
+                + buildTabla({ rows: masRapidos, isDelay: false }));
+        }
 
-        const notaSinVariaciones = (!demorados.length && !masRapidos.length)
-            ? `<p style="color:#64748B;font-size:13px;text-align:center;padding:20px 0;font-family:Arial,sans-serif;">Sin variaciones significativas (umbral: ${umbral} min).</p>`
-            : '';
+        if (!partes.length) {
+            partes.push(`<p style="${FONT}color:#94A3B8;font-size:12px;margin:0;">`
+                + `Sin variaciones por encima del umbral (${umbral} min).</p>`);
+        }
 
-        return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;font-size:13px;color:#1E293B;max-width:800px;margin:0 auto;padding:20px;">
-            ${tablaDemorados}
-            ${demorados.length > 0 && masRapidos.length > 0 ? '<div style="height:24px;"></div>' : ''}
-            ${onLineBlock}
-            ${demorados.length > 0 && masRapidos.length > 0 ? '<div style="height:24px;"></div>' : ''}
-            ${tablaRapidos}
-            ${notaSinVariaciones}
-        </body></html>`;
+        return `<!DOCTYPE html><html><body style="${FONT}font-size:13px;color:#0F172A;margin:0;padding:0;">`
+            + partes.join('')
+            + `</body></html>`;
     }
 
     function copiarInforme() {
