@@ -1298,26 +1298,43 @@
         return h > 0 ? `${sign}${h}h ${m}min` : `${sign}${m}min`;
     };
 
-    // Compute planned finish hour for a row — tries fechaFinRef first,
-    // then falls back to fechaInicioRef + duracionRef.
-    // Handles both Date objects (fresh data) and ISO strings (localStorage restore).
+    // Compute planned finish hour for a row.
+    // Priority chain (each step handles both Date objects and ISO/string values):
+    //  1. fechaFinRef  — Excel "Fecha Fin" column (UTC-based)
+    //  2. fechaInicioRef + duracionRef — Excel "Fecha Inicio" + duration (UTC-based)
+    //  3. deberiaFinalizar — fechaInicioReal + duracionRef (local-time, always computed)
     const computeHoraRef = (fila) => {
-        const toDate = (v) => {
-            if (!v) return null;
+        // Generic converter: handles Date, ISO string, or number
+        const asDate = (v) => {
+            if (!v && v !== 0) return null;
             if (v instanceof Date) return isNaN(v) ? null : v;
             const d = new Date(v);
             return isNaN(d) ? null : d;
         };
-        // fechaFinRef — UTC-based Excel date
-        const fin = toDate(fila?.fechaFinRef);
-        if (fin) return formatHHMM(fin);
-        // fallback: fechaInicioRef + duracionRef
-        const ini    = toDate(fila?.fechaInicioRef);
+
+        // 1. fechaFinRef (UTC Excel date)
+        const fin = asDate(fila?.fechaFinRef);
+        if (fin) {
+            const h = formatHHMM(fin);
+            if (h && h !== '00:00') return h;
+        }
+
+        // 2. fechaInicioRef + duracionRef (UTC Excel date + ref duration)
+        const ini    = asDate(fila?.fechaInicioRef);
         const durMin = parseDuracion(fila?.duracionRef);
         if (ini && durMin !== null) {
-            const d = new Date(ini.getTime() + durMin * 60000);
-            return formatHHMM(d);
+            const h = formatHHMM(new Date(ini.getTime() + durMin * 60000));
+            if (h && h !== '00:00') return h;
         }
+
+        // 3. deberiaFinalizar = fechaInicioReal + duracionRef (local time, always present for executed rows)
+        const deb = asDate(fila?.deberiaFinalizar);
+        if (deb) {
+            // deberiaFinalizar uses local time (built from CSV dates with _local=true)
+            const pad = n => String(n).padStart(2, '0');
+            return `${pad(deb.getHours())}:${pad(deb.getMinutes())}`;
+        }
+
         return null;
     };
 
