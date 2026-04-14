@@ -1278,7 +1278,22 @@
         return h + ':' + m;
     }
 
-    // Returns rows visible in the current window + next 10 pending
+    // Returns the ganttOffsetMin that shows the last executed row
+    function offsetDesdeUltimoEjecutado() {
+        if (!currentRows) return 0;
+        // Walk backwards to find last row with real data
+        for (let i = currentRows.length - 1; i >= 0; i--) {
+            const r = currentRows[i];
+            if (r.fechaInicioReal && r.fechaFinReal) {
+                return Math.max(0, horaAMinutos(r.fechaInicioReal) - 5);
+            }
+        }
+        // No executed rows — fall back to first row
+        const first = currentRows.find(r => r.fechaInicioReal);
+        return first ? Math.max(0, horaAMinutos(first.fechaInicioReal) - 5) : 0;
+    }
+
+    // Returns rows visible in the current window + pending up to proceso 99011
     function prepararDatosGantt(filas, offsetMin) {
         const ventanaFin = offsetMin + VENTANA_MINUTOS;
 
@@ -1291,13 +1306,14 @@
                 return ini !== null && fin !== null && ini < ventanaFin && fin > offsetMin;
             });
 
-        // Next 10 pending rows immediately after the last executed one
+        // Pending rows: from after last executed, up to and including proceso 99011
         let lastExecIdx = -1;
         filas.forEach((f, i) => { if (f.fechaInicioReal && f.fechaFinReal) lastExecIdx = i; });
+        const releaseIdx = filas.findIndex(f => String(f.proceso).trim() === '99011');
+        const hasta = releaseIdx >= 0 ? releaseIdx + 1 : filas.length;
         const pendientes = filas
-            .slice(lastExecIdx + 1)
-            .filter(f => !f.fechaInicioReal)
-            .slice(0, 10);
+            .slice(lastExecIdx + 1, hasta)
+            .filter(f => !f.fechaInicioReal);
 
         return [...ejecutados, ...pendientes].map(f => ({
             ...f,
@@ -1447,11 +1463,15 @@
 
     function abrirGantt() {
         if (!currentRows) return;
-        // Open window ~15 min before current time
-        const ahora = new Date();
-        let ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
-        if (ahora.getHours() < 12) ahoraMin += 24 * 60;
-        ganttOffsetMin = Math.max(0, ahoraMin - 15);
+        // Open window at the first executed row's time (avoids the clock
+        // vs. batch-time mismatch — overnight batches map to 1440+ min
+        // while daytime clock is only ~700 min)
+        const firstExec = currentRows.find(r => r.fechaInicioReal && r.fechaFinReal);
+        if (firstExec) {
+            ganttOffsetMin = Math.max(0, horaAMinutos(firstExec.fechaInicioReal) - 5);
+        } else {
+            ganttOffsetMin = 0;
+        }
 
         const now = new Date();
         const pad = n => String(n).padStart(2, '0');
@@ -1731,10 +1751,8 @@
         renderGantt(currentRows);
     });
     document.getElementById('btnGanttAhora').addEventListener('click', () => {
-        const ahora = new Date();
-        let ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
-        if (ahora.getHours() < 12) ahoraMin += 24 * 60;
-        ganttOffsetMin = Math.max(0, ahoraMin - 15);
+        // Jump to the last executed row (batch frontier), not the clock
+        ganttOffsetMin = offsetDesdeUltimoEjecutado();
         renderGantt(currentRows);
     });
 
