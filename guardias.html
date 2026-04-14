@@ -402,7 +402,76 @@
         .empty-state-cc p {
             font-size: 0.875rem;
         }
-    </style>
+
+        /* ── Session banner ── */
+        .session-banner {
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            border-radius: 12px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .session-banner.hidden { display: none; }
+
+        .session-banner-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .session-banner-icon {
+            width: 36px;
+            height: 36px;
+            background: #DBEAFE;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #2563EB;
+            flex-shrink: 0;
+        }
+
+        .session-banner-texts {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .session-banner-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #1D4ED8;
+        }
+
+        .session-banner-detail {
+            font-size: 0.78rem;
+            color: #3B82F6;
+        }
+
+        .btn-nueva-guardia {
+            padding: 7px 16px;
+            background: #ffffff;
+            border: 1px solid #BFDBFE;
+            border-radius: 8px;
+            color: #2563EB;
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 150ms, border-color 150ms;
+            flex-shrink: 0;
+        }
+
+        .btn-nueva-guardia:hover {
+            background: #DBEAFE;
+            border-color: #93C5FD;
+        }
 </head>
 
 <body>
@@ -454,6 +523,20 @@
             <div class="page-header">
                 <h1>Guardias</h1>
                 <p id="pageSubtitle">Cargá los archivos para comenzar</p>
+            </div>
+
+            <!-- Session banner — visible when localStorage has saved data -->
+            <div class="session-banner hidden" id="sessionBanner">
+                <div class="session-banner-left">
+                    <div class="session-banner-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="session-banner-texts">
+                        <span class="session-banner-title">Sesión activa</span>
+                        <span class="session-banner-detail" id="sessionDetail">—</span>
+                    </div>
+                </div>
+                <button class="btn-nueva-guardia" id="btnNuevaGuardia">Nueva guardia</button>
             </div>
 
             <!-- Upload cards -->
@@ -515,8 +598,76 @@
     // ─────────────────────────────────────────────
     //  State
     // ─────────────────────────────────────────────
-    let parsedComparativo = null;
-    let parsedProbatch    = null;
+    let parsedComparativo        = null;
+    let parsedProbatch           = null;
+    let archivoComparativoNombre = null;
+    let archivoCsvNombre         = null;
+
+    const STORAGE_KEY = 'sqr_guardia_sesion';
+
+    // ─────────────────────────────────────────────
+    //  localStorage helpers
+    // ─────────────────────────────────────────────
+    function guardarSesion(datos) {
+        const sesion = {
+            timestamp:           new Date().toISOString(),
+            comparativoNombre:   archivoComparativoNombre || '—',
+            csvNombre:           archivoCsvNombre         || '—',
+            datos
+        };
+        try {
+            const json = JSON.stringify(sesion);
+            if (json.length > 4 * 1024 * 1024) {
+                console.warn('Datos muy grandes para localStorage — solo en memoria.');
+                return;
+            }
+            localStorage.setItem(STORAGE_KEY, json);
+            mostrarBannerSesion(sesion);
+        } catch (e) {
+            console.warn('No se pudo guardar en localStorage:', e);
+        }
+    }
+
+    function restaurarFechas(row) {
+        // JSON.parse turns Dates into strings — convert back
+        const rehydrate = val => {
+            if (!val) return null;
+            const d = new Date(val);
+            if (isNaN(d)) return null;
+            d._local = true;
+            return d;
+        };
+        return {
+            ...row,
+            onLine:           rehydrate(row.onLine),
+            deberiaFinalizar: rehydrate(row.deberiaFinalizar)
+        };
+    }
+
+    function mostrarBannerSesion(sesion) {
+        const ts  = new Date(sesion.timestamp);
+        const pad = n => String(n).padStart(2, '0');
+        const hora = `${pad(ts.getHours())}:${pad(ts.getMinutes())}`;
+        document.getElementById('sessionDetail').textContent =
+            `Cargado a las ${hora} · ${sesion.comparativoNombre} + ${sesion.csvNombre}`;
+        document.getElementById('sessionBanner').classList.remove('hidden');
+    }
+
+    function restaurarSesion() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const sesion = JSON.parse(raw);
+            if (!sesion?.datos?.length) return;
+            mostrarBannerSesion(sesion);
+            const rows = sesion.datos.map(restaurarFechas);
+            renderTabla(rows);
+            updateSubtitle();
+        } catch (e) {
+            console.warn('No se pudo restaurar la sesión:', e);
+            localStorage.removeItem(STORAGE_KEY);
+        }
+    }
 
     // ─────────────────────────────────────────────
     //  Utility — parse duración HH:MM:SS → minutes
@@ -939,6 +1090,7 @@
     document.getElementById('inputComparativo').addEventListener('change', async function () {
         const file = this.files[0];
         if (!file) return;
+        archivoComparativoNombre = file.name;
         try {
             parsedComparativo = await parseComparativo(file);
             const sqrCount = parsedComparativo.filter(r => r.sqr).length;
@@ -958,6 +1110,7 @@
     document.getElementById('inputProbatch').addEventListener('change', async function () {
         const file = this.files[0];
         if (!file) return;
+        archivoCsvNombre = file.name;
         try {
             parsedProbatch = await parseProBatch(file);
             document.getElementById('statusProbatchText').textContent =
@@ -990,8 +1143,24 @@
         if (!parsedComparativo || !parsedProbatch) return;
         const resultado = generarCaminoCritico(parsedComparativo, parsedProbatch);
         renderTabla(resultado);
+        guardarSesion(resultado);
         document.getElementById('resultsContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+
+    // ─────────────────────────────────────────────
+    //  Nueva guardia button
+    // ─────────────────────────────────────────────
+    document.getElementById('btnNuevaGuardia').addEventListener('click', () => {
+        if (confirm('¿Seguro que querés iniciar una nueva guardia? Se borrarán los datos actuales.')) {
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+        }
+    });
+
+    // ─────────────────────────────────────────────
+    //  Init — restore session if available
+    // ─────────────────────────────────────────────
+    restaurarSesion();
     </script>
 </body>
 </html>
