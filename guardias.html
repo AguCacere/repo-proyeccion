@@ -1074,6 +1074,7 @@
                 proceso:         ref.proceso,
                 sqr:             ref.sqr,
                 duracionRef:     ref.duracionRef,
+                fechaFinRef:     ref.fechaFinRef,      // Excel planned finish time
                 faltaBatch:      ref.faltaBatch,
                 fechaInicioReal: real?.fechaInicio || null,
                 fechaFinReal:    real?.fechaFin    || null,
@@ -1297,188 +1298,266 @@
     };
 
     const buildTimeline = (filas) => {
-        const hitos = HITOS_CRITICOS.map(id => {
-            const fila = filas.find(f => String(f.proceso).trim() === id);
+        // Build raw hito objects
+        const rawHitos = HITOS_CRITICOS.map(id => {
+            const fila      = filas.find(f => String(f.proceso).trim() === id);
+            const completado = !!(fila?.fechaInicioReal && fila?.fechaFinReal);
             return {
                 id,
-                esFin:      id === HITO_FIN,
-                fila:       fila || null,
-                completado: !!(fila?.fechaInicioReal && fila?.fechaFinReal),
-                horaReal:   fila?.fechaFinReal  ? formatHora(fila.fechaFinReal)  : null,
-                horaRef:    fila?.duracionRef   ?? null,
-                incremento: fila?.incremento    ?? null,
-                onLine:     fila?.onLine        ? formatHora(fila.onLine)        : null
+                sqr:             fila?.sqr || null,
+                esFin:           id === HITO_FIN,
+                fila:            fila || null,
+                completado,
+                horaReal:        fila?.fechaFinReal ? formatHora(fila.fechaFinReal) : null,
+                horaRefEstimada: fila?.fechaFinRef  ? formatHHMM(fila.fechaFinRef)  : null,
+                incremento:      fila?.incremento   ?? null,
+                onLine:          fila?.onLine       ? formatHora(fila.onLine)       : null
             };
         });
 
-        const proximoIdx    = hitos.findIndex(h => !h.completado);
-        const completados   = hitos.filter(h => h.completado).length;
-        const pctCompletado = Math.round((completados / hitos.length) * 100);
+        // Sort completed by fechaInicioReal ascending; pending stays in HITOS_CRITICOS order
+        const completadosArr = rawHitos
+            .filter(h => h.completado)
+            .sort((a, b) => new Date(a.fila.fechaInicioReal) - new Date(b.fila.fechaInicioReal));
+        const pendientesArr  = rawHitos.filter(h => !h.completado);
+        const hitos          = [...completadosArr, ...pendientesArr];
+        const separatorIdx   = completadosArr.length; // insert separator before this index
+
+        const pctCompletado = Math.round((completadosArr.length / hitos.length) * 100);
 
         const ultimaFilaOnLine = [...filas].reverse().find(f => f.onLine);
-        const ultimoOnLine = ultimaFilaOnLine ? formatHora(ultimaFilaOnLine.onLine) : '—';
+        const ultimoOnLine     = ultimaFilaOnLine ? formatHora(ultimaFilaOnLine.onLine) : '—';
 
-        const varAcum = hitos
-            .filter(h => h.completado && h.incremento !== null)
+        const varAcum = completadosArr
+            .filter(h => h.incremento !== null)
             .reduce((acc, h) => acc + h.incremento, 0);
 
-        return { hitos, proximoIdx, pctCompletado, ultimoOnLine, varAcum };
+        return { hitos, separatorIdx, nCompletados: completadosArr.length, pctCompletado, ultimoOnLine, varAcum };
     };
 
     const renderTimeline = (filas) => {
-        const { hitos, proximoIdx, pctCompletado, ultimoOnLine, varAcum } = buildTimeline(filas);
+        const { hitos, separatorIdx, nCompletados, pctCompletado, ultimoOnLine, varAcum } = buildTimeline(filas);
         const procesoActivo = [...filas].reverse().find(f => f.fechaInicioReal && f.fechaFinReal);
 
         const varColor  = varAcum <= 0 ? '#065F46' : '#991B1B';
-        const varBg     = varAcum <= 0 ? '#ECFDF5' : '#FEF2F2';
         const varSymbol = varAcum <= 0 ? '▼' : '▲';
 
-        const hitosHTML = hitos.map((h, i) => {
-            const esProximo  = i === proximoIdx;
-            const esPendiente = !h.completado && !esProximo;
+        // Build each row, inserting separator between completed and pending
+        const rows = [];
 
-            let cardBorderLeft = '3px solid #E2E8F0';
-            let cardBg         = '#F8FAFC';
-            let badgeHTML      = '';
-            let horaHTML       = '';
-            let deltaHTML      = '';
-            let tiempoHTML     = '';
-
-            if (h.esFin) {
-                cardBorderLeft = '3px solid #10B981';
-                cardBg         = '#ECFDF5';
-                badgeHTML = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#D1FAE5;color:#065F46;">Fin del batch</span>`;
-                horaHTML  = `<div style="display:flex;gap:20px;">
-                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">On Line est.</div>
-                    <div style="font-size:15px;font-weight:500;color:#065F46;">${ultimoOnLine}</div></div>
-                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Referencia</div>
-                    <div style="font-size:15px;font-weight:500;color:#64748B;">${h.horaRef || '—'}</div></div>
-                </div>`;
-                deltaHTML  = `<span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:8px;background:#D1FAE5;color:#065F46;">último proceso del batch</span>`;
-                tiempoHTML = `<span style="font-size:11px;color:#64748B;">relese.sh</span>`;
-
-            } else if (h.completado) {
-                cardBorderLeft = '3px solid #3B82F6';
-                cardBg         = 'white';
-                badgeHTML = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#DBEAFE;color:#1D4ED8;">Completado</span>`;
-                const deltaBg     = (h.incremento ?? 0) <= 0 ? '#DCFCE7' : '#FEE2E2';
-                const deltaColor  = (h.incremento ?? 0) <= 0 ? '#166534' : '#991B1B';
-                const deltaSymbol = (h.incremento ?? 0) <= 0 ? '▼' : '▲';
-                horaHTML  = `<div style="display:flex;gap:20px;">
-                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Real</div>
-                    <div style="font-size:15px;font-weight:500;color:#0F172A;">${h.horaReal}</div></div>
-                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Referencia</div>
-                    <div style="font-size:15px;font-weight:500;color:#64748B;">${h.horaRef || '—'}</div></div>
-                </div>`;
-                deltaHTML  = `<span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:8px;background:${deltaBg};color:${deltaColor};">${deltaSymbol} ${minToHuman(h.incremento)} vs ref.</span>`;
-                tiempoHTML = `<span style="font-size:11px;color:#64748B;">completado</span>`;
-
-            } else if (esProximo) {
-                cardBorderLeft = '3px solid #3B82F6';
-                cardBg         = '#EFF6FF';
-                badgeHTML = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#DBEAFE;color:#1D4ED8;">Próximo hito</span>`;
-                horaHTML  = `<div style="display:flex;gap:20px;">
-                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Estimado</div>
-                    <div style="font-size:15px;font-weight:500;color:#1D4ED8;">${h.onLine || '—'}</div></div>
-                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Referencia</div>
-                    <div style="font-size:15px;font-weight:500;color:#64748B;">${h.horaRef || '—'}</div></div>
-                </div>`;
-                deltaHTML  = `<span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:8px;background:#DBEAFE;color:#1D4ED8;">en curso</span>`;
-                tiempoHTML = `<span style="font-size:11px;color:#3B82F6;">On Line ~${ultimoOnLine}</span>`;
-
-            } else {
-                badgeHTML = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#F1F5F9;color:#64748B;">Pendiente</span>`;
-                horaHTML  = `<div style="display:flex;gap:20px;opacity:.6;">
-                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Proyección</div>
-                    <div style="font-size:15px;font-weight:500;color:#64748B;">${h.onLine || '—'}</div></div>
-                    <div><div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Referencia</div>
-                    <div style="font-size:15px;font-weight:500;color:#64748B;">${h.horaRef || '—'}</div></div>
-                </div>`;
-                deltaHTML  = `<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:#F1F5F9;color:#64748B;">pendiente</span>`;
-                tiempoHTML = `<span style="font-size:11px;color:#64748B;">On Line ~${ultimoOnLine}</span>`;
+        hitos.forEach((h, i) => {
+            // ── Insert separator before first pending ──────────────
+            if (i === separatorIdx && separatorIdx > 0 && separatorIdx < hitos.length) {
+                rows.push(`
+                    <div style="display:flex;align-items:stretch;">
+                        <div style="width:52px;flex-shrink:0;"></div>
+                        <div style="width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;">
+                            <div style="width:4px;flex:1;background:#E2E8F0;"></div>
+                        </div>
+                        <div style="flex:1;display:flex;align-items:center;padding:6px 0 6px 14px;">
+                            <div style="flex:1;border-top:.5px dashed #CBD5E1;"></div>
+                            <span style="font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;padding:0 10px;white-space:nowrap;">Pendientes</span>
+                            <div style="flex:1;border-top:.5px dashed #CBD5E1;"></div>
+                        </div>
+                    </div>`);
             }
 
+            const esProximo   = i === separatorIdx;
+            const esPendiente = i > separatorIdx;
+
+            // ── Visual state ───────────────────────────────────────
+            let cardBg          = 'white';
+            let cardBorderLeft  = '3px solid #E2E8F0';
+            let badgeHTML       = '';
+            let horaDisplay     = '—';
+            let horaLabel       = 'Real';
+            let refDisplay      = h.horaRefEstimada || '—';
+            let deltaHTML       = '';
+            let headerColor     = '#0F172A';
+            let timeColColor    = '#64748B';
+            let timeColDisplay  = h.horaReal || '—';
+
+            if (h.esFin && h.completado) {
+                cardBg         = '#ECFDF5';
+                cardBorderLeft = '3px solid #10B981';
+                badgeHTML      = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#D1FAE5;color:#065F46;font-weight:600;">Fin del batch</span>`;
+                horaDisplay    = h.horaReal;
+                horaLabel      = 'Real';
+                headerColor    = '#065F46';
+                timeColColor   = '#065F46';
+                const inc      = h.incremento ?? 0;
+                const dBg      = inc <= 0 ? '#DCFCE7' : '#FEE2E2';
+                const dCol     = inc <= 0 ? '#166534' : '#991B1B';
+                const dSym     = inc <= 0 ? '▼' : '▲';
+                deltaHTML      = `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:${dBg};color:${dCol};">${dSym} ${minToHuman(inc)} vs ref.</span>`;
+
+            } else if (h.esFin && !h.completado) {
+                cardBg         = '#F0FDF4';
+                cardBorderLeft = '3px solid #10B981';
+                badgeHTML      = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#D1FAE5;color:#065F46;font-weight:600;">Fin del batch</span>`;
+                horaDisplay    = ultimoOnLine;
+                horaLabel      = 'On Line est.';
+                headerColor    = '#065F46';
+                timeColColor   = '#065F46';
+                timeColDisplay = ultimoOnLine;
+                deltaHTML      = `<span style="font-size:10px;padding:2px 7px;border-radius:6px;background:#D1FAE5;color:#065F46;">relese.sh</span>`;
+
+            } else if (h.completado) {
+                cardBg         = 'white';
+                cardBorderLeft = '3px solid #3B82F6';
+                badgeHTML      = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#DBEAFE;color:#1D4ED8;font-weight:600;">Completado</span>`;
+                horaDisplay    = h.horaReal;
+                horaLabel      = 'Real';
+                headerColor    = '#0F172A';
+                timeColColor   = '#1D4ED8';
+                const inc      = h.incremento ?? 0;
+                const dBg      = inc <= 0 ? '#DCFCE7' : '#FEE2E2';
+                const dCol     = inc <= 0 ? '#166534' : '#991B1B';
+                const dSym     = inc <= 0 ? '▼' : '▲';
+                deltaHTML      = `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:${dBg};color:${dCol};">${dSym} ${minToHuman(inc)} vs ref.</span>`;
+
+            } else if (esProximo) {
+                cardBg         = '#EFF6FF';
+                cardBorderLeft = '3px solid #3B82F6';
+                badgeHTML      = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#DBEAFE;color:#1D4ED8;font-weight:600;">Próximo</span>`;
+                horaDisplay    = h.onLine || '—';
+                horaLabel      = 'On Line est.';
+                headerColor    = '#1D4ED8';
+                timeColColor   = '#3B82F6';
+                timeColDisplay = h.onLine || ultimoOnLine;
+                deltaHTML      = `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:#DBEAFE;color:#1D4ED8;">en curso</span>`;
+
+            } else {
+                cardBg         = '#FAFAFA';
+                cardBorderLeft = '3px solid #E2E8F0';
+                badgeHTML      = `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#F1F5F9;color:#94A3B8;">Pendiente</span>`;
+                horaDisplay    = h.onLine || '—';
+                horaLabel      = 'Proyección';
+                headerColor    = '#64748B';
+                timeColColor   = '#94A3B8';
+                timeColDisplay = h.onLine || ultimoOnLine;
+                deltaHTML      = `<span style="font-size:10px;padding:2px 7px;border-radius:6px;background:#F1F5F9;color:#94A3B8;">pendiente</span>`;
+            }
+
+            // ── Dot ───────────────────────────────────────────────
             const dotFill   = h.completado ? '#3B82F6' : 'white';
-            const dotBorder = h.completado ? '#3B82F6' : esProximo ? '#3B82F6' : h.esFin ? '#10B981' : '#CBD5E1';
-            const dotShadow = esProximo ? '0 0 0 4px #DBEAFE' : h.esFin && !h.completado ? '0 0 0 4px #D1FAE5' : 'none';
-            const checkHTML = h.completado
-                ? `<div style="width:7px;height:7px;border-right:2px solid white;border-bottom:2px solid white;transform:rotate(45deg) translate(-1px,-1px);"></div>`
+            const dotBorder = h.completado ? '#3B82F6'
+                            : esProximo    ? '#3B82F6'
+                            : h.esFin      ? '#10B981'
+                            :                '#D1D5DB';
+            const dotShadow = esProximo      ? '0 0 0 5px #DBEAFE, 0 2px 8px rgba(59,130,246,.25)'
+                            : h.completado  ? '0 2px 6px rgba(59,130,246,.2)'
+                            : h.esFin       ? '0 0 0 5px #D1FAE5'
+                            :                 'none';
+            const checkSVG  = h.completado
+                ? `<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
                 : '';
 
-            const lineColorAbove = i === 0 ? (h.completado ? '#3B82F6' : '#E2E8F0') : null;
-            const lineColorBelow = i < hitos.length - 1
-                ? (hitos[i + 1]?.completado ? '#3B82F6' : '#E2E8F0')
-                : null;
+            // ── Line colours ──────────────────────────────────────
+            const isNextCompleted = hitos[i + 1]?.completado ?? false;
+            const lineColorAbove  = (i === 0) ? (h.completado ? '#3B82F6' : '#E2E8F0') : (h.completado ? '#3B82F6' : '#E2E8F0');
+            const lineColorBelow  = (i === hitos.length - 1) ? 'transparent'
+                                  : isNextCompleted           ? '#3B82F6'
+                                  :                             '#E2E8F0';
 
-            return `<div style="display:flex;align-items:flex-start;gap:0;">
-                <div style="display:flex;flex-direction:column;align-items:center;width:48px;flex-shrink:0;">
-                    ${lineColorAbove !== null ? `<div style="width:2px;height:12px;background:${lineColorAbove};"></div>` : ''}
-                    <div style="width:22px;height:22px;border-radius:50%;background:${dotFill};border:3px solid ${dotBorder};box-shadow:${dotShadow};display:flex;align-items:center;justify-content:center;z-index:1;flex-shrink:0;">${checkHTML}</div>
-                    ${lineColorBelow !== null ? `<div style="width:2px;flex:1;min-height:24px;background:${lineColorBelow};"></div>` : ''}
-                </div>
-                <div style="flex:1;background:${cardBg};border:.5px solid #E2E8F0;border-left:${cardBorderLeft};border-radius:10px;padding:12px 14px;margin-bottom:12px;margin-left:16px;${esPendiente ? 'opacity:.75;' : ''}">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                        <span style="font-size:14px;font-weight:500;color:${h.esFin ? '#065F46' : esProximo ? '#1D4ED8' : '#0F172A'};">${h.id}${h.esFin ? ' — relese.sh' : ''}</span>
-                        ${badgeHTML}
+            // ── SQR label ─────────────────────────────────────────
+            const sqrLabel = h.sqr
+                ? `<span style="font-size:11px;color:#94A3B8;margin-left:6px;font-weight:400;">${h.sqr}</span>`
+                : '';
+
+            rows.push(`
+                <div style="display:flex;align-items:stretch;">
+                    <!-- Time column -->
+                    <div style="width:52px;flex-shrink:0;text-align:right;padding-right:10px;padding-top:9px;">
+                        <span style="font-size:13px;font-weight:600;color:${timeColColor};font-variant-numeric:tabular-nums;line-height:1;">${timeColDisplay}</span>
                     </div>
-                    ${horaHTML}
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:.5px solid #E2E8F0;">
-                        ${deltaHTML}
-                        ${tiempoHTML}
+
+                    <!-- Connector column: line + dot + line, stretches to card height -->
+                    <div style="width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;">
+                        <div style="width:4px;height:10px;background:${lineColorAbove};flex-shrink:0;"></div>
+                        <div style="width:28px;height:28px;border-radius:50%;background:${dotFill};border:3px solid ${dotBorder};box-shadow:${dotShadow};display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;">${checkSVG}</div>
+                        <div style="width:4px;flex:1;background:${lineColorBelow};"></div>
                     </div>
-                </div>
-            </div>`;
-        }).join('');
+
+                    <!-- Card -->
+                    <div style="flex:1;padding-left:12px;padding-bottom:10px;">
+                        <div style="background:${cardBg};border:.5px solid #E2E8F0;border-left:${cardBorderLeft};border-radius:10px;padding:9px 13px;${esPendiente ? 'opacity:.72;' : ''}">
+                            <!-- Header: ID + SQR + badge -->
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+                                <div>
+                                    <span style="font-size:13px;font-weight:600;color:${headerColor};">${h.id}</span>
+                                    ${sqrLabel}
+                                </div>
+                                ${badgeHTML}
+                            </div>
+                            <!-- Times row -->
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div>
+                                    <div style="font-size:9px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px;">${horaLabel}</div>
+                                    <div style="font-size:16px;font-weight:600;color:${headerColor};font-variant-numeric:tabular-nums;line-height:1;">${horaDisplay}</div>
+                                </div>
+                                <div style="color:#CBD5E1;font-size:14px;margin-top:8px;">→</div>
+                                <div>
+                                    <div style="font-size:9px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px;">Referencia</div>
+                                    <div style="font-size:16px;font-weight:500;color:#94A3B8;font-variant-numeric:tabular-nums;line-height:1;">${refDisplay}</div>
+                                </div>
+                                <div style="margin-left:auto;padding-top:10px;">${deltaHTML}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
+        });
 
         const fechaLabel = new Date().toLocaleDateString('es-AR', {
             weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
         });
 
-        const procesoActivoHTML = procesoActivo ? `
-            <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:20px;">
-                <div style="width:8px;height:8px;border-radius:50%;background:#3B82F6;flex-shrink:0;"></div>
-                <div>
-                    <div style="font-size:12px;font-weight:500;color:#1D4ED8;">Último proceso registrado — ${procesoActivo.sqr || procesoActivo.proceso}</div>
-                    <div style="font-size:11px;color:#3B82F6;margin-top:2px;">Lote ${procesoActivo.lote} · Fin ${formatHora(procesoActivo.fechaFinReal)} · On Line estimado ${ultimoOnLine}</div>
-                </div>
-            </div>` : '';
-
         return `<div style="font-family:Arial,Helvetica,sans-serif;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:16px;border-bottom:.5px solid #E2E8F0;">
+            <!-- Header strip -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:14px;border-bottom:.5px solid #E2E8F0;">
                 <div>
-                    <div style="font-size:15px;font-weight:500;color:#0F172A;">Línea de tiempo — Camino Crítico</div>
-                    <div style="font-size:12px;color:#64748B;margin-top:3px;">${fechaLabel}</div>
+                    <div style="font-size:14px;font-weight:600;color:#0F172A;">Línea de tiempo</div>
+                    <div style="font-size:11px;color:#64748B;margin-top:2px;">${fechaLabel}</div>
                 </div>
                 <div style="text-align:right;">
-                    <div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.05em;">On Line estimado</div>
-                    <div style="font-size:28px;font-weight:500;color:#1D4ED8;">${ultimoOnLine}</div>
+                    <div style="font-size:9.5px;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;">On Line estimado</div>
+                    <div style="font-size:26px;font-weight:600;color:#1D4ED8;font-variant-numeric:tabular-nums;line-height:1.1;">${ultimoOnLine}</div>
                 </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);border:.5px solid #E2E8F0;border-radius:10px;overflow:hidden;margin-bottom:20px;">
-                <div style="padding:12px 16px;border-right:.5px solid #E2E8F0;">
-                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748B;margin-bottom:4px;">Hitos completados</div>
-                    <div style="font-size:18px;font-weight:500;color:#0F172A;">${hitos.filter(h=>h.completado).length}<span style="font-size:13px;color:#64748B;font-weight:400;"> / ${hitos.length}</span></div>
+            <!-- Metrics grid -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);border:.5px solid #E2E8F0;border-radius:10px;overflow:hidden;margin-bottom:16px;">
+                <div style="padding:10px 14px;border-right:.5px solid #E2E8F0;">
+                    <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:3px;">Completados</div>
+                    <div style="font-size:17px;font-weight:600;color:#0F172A;">${nCompletados}<span style="font-size:12px;color:#94A3B8;font-weight:400;"> / ${hitos.length}</span></div>
                 </div>
-                <div style="padding:12px 16px;border-right:.5px solid #E2E8F0;">
-                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748B;margin-bottom:4px;">On Line</div>
-                    <div style="font-size:18px;font-weight:500;color:#1D4ED8;">${ultimoOnLine}</div>
+                <div style="padding:10px 14px;border-right:.5px solid #E2E8F0;">
+                    <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:3px;">On Line</div>
+                    <div style="font-size:17px;font-weight:600;color:#1D4ED8;font-variant-numeric:tabular-nums;">${ultimoOnLine}</div>
                 </div>
-                <div style="padding:12px 16px;border-right:.5px solid #E2E8F0;">
-                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748B;margin-bottom:4px;">Variación acumulada</div>
-                    <div style="font-size:18px;font-weight:500;color:${varColor};">${varSymbol} ${minToHuman(Math.abs(varAcum))}</div>
+                <div style="padding:10px 14px;border-right:.5px solid #E2E8F0;">
+                    <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:3px;">Variación acum.</div>
+                    <div style="font-size:17px;font-weight:600;color:${varColor};">${varSymbol} ${minToHuman(Math.abs(varAcum))}</div>
                 </div>
-                <div style="padding:12px 16px;">
-                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748B;margin-bottom:4px;">Avance</div>
-                    <div style="font-size:18px;font-weight:500;color:#0F172A;">${pctCompletado}%</div>
-                    <div style="height:4px;background:#E2E8F0;border-radius:2px;margin-top:6px;"><div style="height:4px;background:#3B82F6;border-radius:2px;width:${pctCompletado}%;"></div></div>
+                <div style="padding:10px 14px;">
+                    <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:3px;">Avance</div>
+                    <div style="font-size:17px;font-weight:600;color:#0F172A;">${pctCompletado}%</div>
+                    <div style="height:3px;background:#E2E8F0;border-radius:2px;margin-top:5px;"><div style="height:3px;background:#3B82F6;border-radius:2px;width:${pctCompletado}%;"></div></div>
                 </div>
             </div>
 
-            ${procesoActivoHTML}
+            ${procesoActivo ? `
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:9px;margin-bottom:14px;">
+                <div style="width:7px;height:7px;border-radius:50%;background:#3B82F6;flex-shrink:0;"></div>
+                <div>
+                    <span style="font-size:11.5px;font-weight:600;color:#1D4ED8;">Último registrado — ${procesoActivo.sqr || procesoActivo.proceso}</span>
+                    <span style="font-size:11px;color:#3B82F6;margin-left:8px;">Fin ${formatHora(procesoActivo.fechaFinReal)} · On Line ~${ultimoOnLine}</span>
+                </div>
+            </div>` : ''}
 
-            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:14px;">Hitos del camino crítico</div>
-            ${hitosHTML}
+            <!-- Hito list -->
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;margin-bottom:10px;padding-left:52px;">Hitos del camino crítico</div>
+            ${rows.join('')}
         </div>`;
     };
 
