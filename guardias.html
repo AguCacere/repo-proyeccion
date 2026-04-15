@@ -1363,10 +1363,23 @@
         const rawHitos = HITOS_CRITICOS.map(id => {
             const fila      = filas.find(f => String(f.proceso).trim() === id);
             const completado = !!(fila?.fechaInicioReal && fila?.fechaFinReal);
-            const refDate    = completado ? computeHoraRefDate(fila) : null;
-            const finishDelta = completado && fila?.fechaFinReal && refDate
-                ? Math.round((csvDate(fila.fechaFinReal) - refDate) / 60000)
-                : null;
+            // Compute finish-time delta from displayed HH:MM strings to avoid
+            // timezone mismatches between XLSX (UTC) and CSV (local) dates.
+            const _horaReal = fila?.fechaFinReal ? formatHora(fila.fechaFinReal) : null;
+            const _horaRef  = computeHoraRef(fila);
+            const _toMin = s => {
+                if (!s || s === '—') return null;
+                const [h, m] = s.split(':').map(Number);
+                return (isNaN(h) || isNaN(m)) ? null : h * 60 + m;
+            };
+            const _rm = _toMin(_horaReal), _refm = _toMin(_horaRef);
+            let finishDelta = null;
+            if (completado && _rm !== null && _refm !== null) {
+                let diff = _rm - _refm;
+                if (diff < -720) diff += 1440; // crossed midnight forward
+                if (diff >  720) diff -= 1440; // crossed midnight backward
+                finishDelta = Math.round(diff);
+            }
 
             return {
                 id,
@@ -1457,28 +1470,28 @@
                             :                'PENDIENTE';
             const badgeHTML = `<span style="font-family:${mono};font-size:8px;font-weight:700;letter-spacing:.12em;padding:3px 9px;border-radius:4px;background:${pal.badge};color:${pal.bText};">${badgeText}</span>`;
 
-            // ── Finish-time Delta (REAL finish vs REF finish) ────────
-            let finishDeltaHTML = '';
-            if (h.finishDelta !== null) {
-                const fd = h.finishDelta;
-                const fdC = fd <= 0 ? '#0D9488' : '#B45309';
-                const fdB = fd <= 0 ? '#CCFBF1'  : '#FFF7ED';
-                const fdS = fd <= 0 ? '▼' : '▲';
-                finishDeltaHTML = `<span style="font-family:${mono};font-size:8px;font-weight:600;padding:2px 7px;border-radius:3px;background:${fdB};color:${fdC};white-space:nowrap;letter-spacing:.06em;">fin ${fdS} ${minToHuman(fd)}</span>`;
-            }
-
-            // ── Delta ────────────────────────────────────────────────
+            // ── Duration delta (task ran X min faster/slower than ref duration) ──
             let deltaHTML = '';
             if (h.incremento !== null) {
                 const inc = h.incremento;
                 const dC  = inc <= 0 ? '#059669' : '#DC2626';
                 const dB  = inc <= 0 ? '#DCFCE7'  : '#FEE2E2';
                 const dS  = inc <= 0 ? '▼' : '▲';
-                deltaHTML = `<span style="font-family:${mono};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:4px;background:${dB};color:${dC};white-space:nowrap;">${dS} ${minToHuman(inc)}</span>`;
+                deltaHTML = `<span style="font-family:${mono};font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:${dB};color:${dC};white-space:nowrap;">${dS} ${minToHuman(inc)}</span>`;
             } else if (esProximo) {
-                deltaHTML = `<span style="font-family:${mono};font-size:9px;padding:2px 8px;border-radius:4px;background:#FEF3C7;color:#B45309;">en curso</span>`;
+                deltaHTML = `<span style="font-family:${mono};font-size:8.5px;padding:2px 7px;border-radius:4px;background:#FEF3C7;color:#B45309;">en curso</span>`;
             } else if (esPendiente) {
-                deltaHTML = `<span style="font-family:${mono};font-size:9px;padding:2px 8px;border-radius:4px;background:#F1F5F9;color:#94A3B8;">pendiente</span>`;
+                deltaHTML = `<span style="font-family:${mono};font-size:8.5px;padding:2px 7px;border-radius:4px;background:#F1F5F9;color:#94A3B8;">pendiente</span>`;
+            }
+
+            // ── Finish-time delta (REAL finish vs REF finish hour) ───
+            let finishDeltaHTML = '';
+            if (h.finishDelta !== null) {
+                const fd = h.finishDelta;
+                const fdC = fd <= 0 ? '#0D9488' : '#B45309';
+                const fdB = fd <= 0 ? '#CCFBF1'  : '#FFF7ED';
+                const fdS = fd <= 0 ? '▼' : '▲';
+                finishDeltaHTML = `<span style="font-family:${mono};font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;background:${fdB};color:${fdC};white-space:nowrap;">fin ${fdS} ${minToHuman(fd)}</span>`;
             }
 
             // ── Dot ──────────────────────────────────────────────────
@@ -1514,26 +1527,28 @@
                         <div style="width:2px;flex:1;background:${lineBelow};"></div>
                     </div>
                     <div style="flex:1;padding-left:12px;padding-bottom:12px;">
-                        <div style="${pal.cardBorder}border-radius:8px;padding:10px 13px;background:${pal.cardBg};${esPendiente ? 'opacity:.55;' : ''}">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <div style="${pal.cardBorder}border-radius:8px;padding:9px 12px;background:${pal.cardBg};${esPendiente ? 'opacity:.55;' : ''}">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
                                 <div>
-                                    <span style="font-family:${mono};font-size:12px;font-weight:700;color:${pal.time};">${h.id}</span>${sqrLabel}
+                                    <span style="font-family:${mono};font-size:11px;font-weight:700;color:${pal.time};">${h.id}</span>${sqrLabel}
                                 </div>
                                 ${badgeHTML}
                             </div>
-                            <div style="display:flex;align-items:baseline;gap:10px;">
+                            <div style="display:flex;align-items:center;gap:8px;">
                                 <div>
-                                    <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:2px;">${horaLabel}</div>
-                                    <div style="font-family:${mono};font-size:18px;font-weight:500;color:${pal.time};line-height:1;letter-spacing:-.5px;">${horaDisplay}</div>
+                                    <div style="font-family:${mono};font-size:8.5px;font-weight:700;letter-spacing:.1em;color:#94A3B8;margin-bottom:2px;">${horaLabel}</div>
+                                    <div style="font-family:${mono};font-size:15px;font-weight:600;color:${pal.time};line-height:1;letter-spacing:-.3px;">${horaDisplay}</div>
                                 </div>
-                                <div style="color:#CBD5E1;font-size:15px;padding-bottom:1px;align-self:flex-end;">→</div>
+                                <div style="color:#CBD5E1;font-size:13px;margin-top:10px;">→</div>
                                 <div>
-                                    <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:2px;">REF.</div>
-                                    <div style="font-family:${mono};font-size:18px;font-weight:400;color:#CBD5E1;line-height:1;letter-spacing:-.5px;">${refDisplay}</div>
+                                    <div style="font-family:${mono};font-size:8.5px;font-weight:700;letter-spacing:.1em;color:#94A3B8;margin-bottom:2px;">REF.</div>
+                                    <div style="font-family:${mono};font-size:15px;font-weight:400;color:#94A3B8;line-height:1;letter-spacing:-.3px;">${refDisplay}</div>
                                 </div>
-                                <div style="margin-left:auto;align-self:flex-end;padding-bottom:2px;">${deltaHTML}</div>
+                                <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+                                    ${deltaHTML}
+                                    ${finishDeltaHTML}
+                                </div>
                             </div>
-                            ${finishDeltaHTML ? `<div style="margin-top:5px;">${finishDeltaHTML}</div>` : ''}
                         </div>
                     </div>
                 </div>`);
