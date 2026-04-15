@@ -1489,12 +1489,12 @@
                             <div style="display:flex;align-items:baseline;gap:10px;">
                                 <div>
                                     <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:2px;">${horaLabel}</div>
-                                    <div style="font-family:${mono};font-size:26px;font-weight:800;color:${pal.time};line-height:1;letter-spacing:-1.5px;">${horaDisplay}</div>
+                                    <div style="font-family:${mono};font-size:18px;font-weight:500;color:${pal.time};line-height:1;letter-spacing:-.5px;">${horaDisplay}</div>
                                 </div>
                                 <div style="color:#CBD5E1;font-size:15px;padding-bottom:1px;align-self:flex-end;">→</div>
                                 <div>
                                     <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:2px;">REF.</div>
-                                    <div style="font-family:${mono};font-size:26px;font-weight:400;color:#CBD5E1;line-height:1;letter-spacing:-1.5px;">${refDisplay}</div>
+                                    <div style="font-family:${mono};font-size:18px;font-weight:400;color:#CBD5E1;line-height:1;letter-spacing:-.5px;">${refDisplay}</div>
                                 </div>
                                 <div style="margin-left:auto;align-self:flex-end;padding-bottom:2px;">${deltaHTML}</div>
                             </div>
@@ -1515,26 +1515,26 @@
             </div>
             <div style="text-align:right;">
                 <div style="font-size:8px;font-weight:700;letter-spacing:.14em;color:#94A3B8;text-transform:uppercase;margin-bottom:4px;">ON LINE ESTIMADO</div>
-                <div style="font-family:${mono};font-size:32px;font-weight:800;color:#0F172A;letter-spacing:-2px;line-height:1;">${ultimoOnLine}</div>
+                <div style="font-family:${mono};font-size:22px;font-weight:600;color:#0F172A;letter-spacing:-1px;line-height:1;">${ultimoOnLine}</div>
             </div>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#E2E8F0;border-radius:10px;overflow:hidden;margin-bottom:14px;">
             <div style="background:#FAFAFA;padding:9px 12px;">
                 <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:4px;">COMPLETADOS</div>
-                <div style="font-family:${mono};font-size:17px;font-weight:800;color:#0F172A;line-height:1;">${nCompletados}<span style="font-size:11px;color:#CBD5E1;font-weight:400;"> /${hitos.length}</span></div>
+                <div style="font-family:${mono};font-size:15px;font-weight:500;color:#0F172A;line-height:1;">${nCompletados}<span style="font-size:11px;color:#CBD5E1;font-weight:400;"> /${hitos.length}</span></div>
             </div>
             <div style="background:#FAFAFA;padding:9px 12px;">
                 <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:4px;">ON LINE</div>
-                <div style="font-family:${mono};font-size:17px;font-weight:800;color:#0F172A;line-height:1;">${ultimoOnLine}</div>
+                <div style="font-family:${mono};font-size:15px;font-weight:500;color:#0F172A;line-height:1;">${ultimoOnLine}</div>
             </div>
             <div style="background:#FAFAFA;padding:9px 12px;">
                 <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:4px;">VARIACIÓN</div>
-                <div style="font-family:${mono};font-size:17px;font-weight:800;color:${varColor};line-height:1;">${varSymbol} ${minToHuman(varAcumAbs)}</div>
+                <div style="font-family:${mono};font-size:15px;font-weight:500;color:${varColor};line-height:1;">${varSymbol} ${minToHuman(varAcumAbs)}</div>
             </div>
             <div style="background:#FAFAFA;padding:9px 12px;">
                 <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:4px;">AVANCE</div>
-                <div style="font-family:${mono};font-size:17px;font-weight:800;color:#0F172A;line-height:1;">${pctCompletado}%</div>
+                <div style="font-family:${mono};font-size:15px;font-weight:500;color:#0F172A;line-height:1;">${pctCompletado}%</div>
                 <div style="height:3px;background:#E2E8F0;border-radius:2px;margin-top:5px;"><div style="height:3px;background:#3B82F6;border-radius:2px;width:${pctCompletado}%;"></div></div>
             </div>
         </div>
