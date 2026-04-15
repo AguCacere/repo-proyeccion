@@ -1339,11 +1339,35 @@
         return null;
     };
 
+    // Like computeHoraRef but returns the raw Date object for arithmetic
+    const computeHoraRefDate = (fila) => {
+        const asDate = (v) => {
+            if (!v && v !== 0) return null;
+            if (v instanceof Date) return isNaN(v) ? null : v;
+            const d = new Date(v);
+            return isNaN(d) ? null : d;
+        };
+        const fin = asDate(fila?.fechaFinRef);
+        if (fin) { const h = formatHHMM(fin); if (h && h !== '00:00') return fin; }
+        const ini    = asDate(fila?.fechaInicioRef);
+        const durMin = parseDuracion(fila?.duracionRef);
+        if (ini && durMin !== null) {
+            const c = new Date(ini.getTime() + durMin * 60000);
+            const h = formatHHMM(c); if (h && h !== '00:00') return c;
+        }
+        return asDate(fila?.deberiaFinalizar);
+    };
+
     const buildTimeline = (filas) => {
         // Build raw hito objects
         const rawHitos = HITOS_CRITICOS.map(id => {
             const fila      = filas.find(f => String(f.proceso).trim() === id);
             const completado = !!(fila?.fechaInicioReal && fila?.fechaFinReal);
+            const refDate    = completado ? computeHoraRefDate(fila) : null;
+            const finishDelta = completado && fila?.fechaFinReal && refDate
+                ? Math.round((csvDate(fila.fechaFinReal) - refDate) / 60000)
+                : null;
+
             return {
                 id,
                 sqr:             fila?.sqr || null,
@@ -1353,6 +1377,7 @@
                 horaReal:        fila?.fechaFinReal ? formatHora(fila.fechaFinReal) : null,
                 horaRefEstimada: computeHoraRef(fila),
                 incremento:      fila?.incremento   ?? null,
+                finishDelta,
                 onLine:          fila?.onLine       ? formatHora(fila.onLine)       : null
             };
         });
@@ -1432,6 +1457,16 @@
                             :                'PENDIENTE';
             const badgeHTML = `<span style="font-family:${mono};font-size:8px;font-weight:700;letter-spacing:.12em;padding:3px 9px;border-radius:4px;background:${pal.badge};color:${pal.bText};">${badgeText}</span>`;
 
+            // ── Finish-time Delta (REAL finish vs REF finish) ────────
+            let finishDeltaHTML = '';
+            if (h.finishDelta !== null) {
+                const fd = h.finishDelta;
+                const fdC = fd <= 0 ? '#0D9488' : '#B45309';
+                const fdB = fd <= 0 ? '#CCFBF1'  : '#FFF7ED';
+                const fdS = fd <= 0 ? '▼' : '▲';
+                finishDeltaHTML = `<span style="font-family:${mono};font-size:8px;font-weight:600;padding:2px 7px;border-radius:3px;background:${fdB};color:${fdC};white-space:nowrap;letter-spacing:.06em;">fin ${fdS} ${minToHuman(fd)}</span>`;
+            }
+
             // ── Delta ────────────────────────────────────────────────
             let deltaHTML = '';
             if (h.incremento !== null) {
@@ -1498,6 +1533,7 @@
                                 </div>
                                 <div style="margin-left:auto;align-self:flex-end;padding-bottom:2px;">${deltaHTML}</div>
                             </div>
+                            ${finishDeltaHTML ? `<div style="margin-top:5px;">${finishDeltaHTML}</div>` : ''}
                         </div>
                     </div>
                 </div>`);
