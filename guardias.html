@@ -1047,12 +1047,33 @@
         const rows = comparativo.map((ref) => {
             const matches = probatchMap[ref.proceso] || [];
 
-            // Prefer OK runs over ERROR runs; within each group take the latest Fecha Fin
-            const okRuns  = matches.filter(r => String(r.estado).toUpperCase() === 'OK');
-            const pool    = okRuns.length > 0 ? okRuns : matches;
-            const real    = pool
-                .slice()
-                .sort((a, b) => new Date(b.fechaFin) - new Date(a.fechaFin))[0] || null;
+            // Build representative run from all attempts for this proceso:
+            // • fechaInicio : earliest start (first attempt, including retries)
+            // • fechaFin    : latest end    (last attempt)
+            // • estado      : ERROR if any run had ERROR; OK only if all were OK
+            // • duracion    : total elapsed from first start to last end (true batch impact)
+            let real = null;
+            if (matches.length > 0) {
+                const byStart  = matches.slice().sort((a, b) => new Date(a.fechaInicio) - new Date(b.fechaInicio));
+                const byEnd    = matches.slice().sort((a, b) => new Date(b.fechaFin)    - new Date(a.fechaFin));
+                const first    = byStart[0];
+                const lastFin  = byEnd[0];
+                const hasError = matches.some(r => String(r.estado).toUpperCase() === 'ERROR');
+
+                if (matches.length === 1) {
+                    real = matches[0]; // single run: use as-is
+                } else {
+                    // Multiple runs (retries): span from first start to last end
+                    const totalMs  = new Date(lastFin.fechaFin) - new Date(first.fechaInicio);
+                    const totalMin = totalMs > 0 ? totalMs / 60000 : 0;
+                    real = {
+                        ...lastFin,
+                        fechaInicio: first.fechaInicio,
+                        estado:      hasError ? 'ERROR' : lastFin.estado,
+                        duracion:    minToHHMM(totalMin)   // total wall-clock duration
+                    };
+                }
+            }
 
             const duracionRefMin  = parseDuracion(ref.duracionRef);
             const duracionRealMin = real ? parseDuracion(real.duracion) : null;
