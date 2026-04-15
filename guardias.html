@@ -7,6 +7,7 @@
     <title>Guardias — Proyección Mensual</title>
     <link rel="stylesheet" href="css/style.css?v=6">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         /* ── Base ── */
         body { background: #F0F4F8; }
@@ -741,10 +742,10 @@
 
     <!-- Timeline modal -->
     <div id="timelineOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.45);z-index:999;align-items:center;justify-content:center;">
-        <div style="background:white;border-radius:16px;width:600px;max-height:90vh;overflow-y:auto;padding:28px;position:relative;z-index:1000;box-shadow:0 20px 60px rgba(0,0,0,0.18),0 4px 16px rgba(0,0,0,0.08);margin:0 20px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                <span style="font-size:15px;font-weight:600;color:#111827;">Línea de tiempo</span>
-                <button onclick="cerrarTimeline()" style="background:#F1F5F9;border:none;font-size:14px;cursor:pointer;color:#64748B;border-radius:8px;padding:6px 10px;line-height:1;transition:background 150ms;" onmouseover="this.style.background='#E2E8F0'" onmouseout="this.style.background='#F1F5F9'">✕</button>
+        <div style="background:#0C1219;border-radius:16px;width:600px;max-height:90vh;overflow-y:auto;padding:20px 24px;position:relative;z-index:1000;box-shadow:0 24px 80px rgba(0,0,0,0.65),0 4px 24px rgba(0,0,0,0.4);margin:0 20px;border:1px solid rgba(255,255,255,0.07);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <span style="font-family:'JetBrains Mono','Fira Code',monospace;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#334155;">LÍNEA DE TIEMPO</span>
+                <button onclick="cerrarTimeline()" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);font-size:13px;cursor:pointer;color:#475569;border-radius:6px;padding:5px 10px;line-height:1;transition:background 150ms;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">✕</button>
             </div>
             <div id="timelineContenido"></div>
         </div>
@@ -1380,9 +1381,18 @@
         const { hitos, separatorIdx, nCompletados, pctCompletado, ultimoOnLine, varAcum } = buildTimeline(filas);
         const procesoActivo = [...filas].reverse().find(f => f.fechaInicioReal && f.fechaFinReal);
 
-        const varColor  = varAcum <= 0 ? '#059669' : '#DC2626';
-        const varSymbol = varAcum <= 0 ? '▼' : '▲';
-        const mono = `'SF Mono','Fira Code','JetBrains Mono','Roboto Mono',ui-monospace,monospace`;
+        const varAcumAbs = Math.abs(varAcum);
+        const varColor   = varAcum <= 0 ? '#4ADE80' : '#FF6B6B';
+        const varSymbol  = varAcum <= 0 ? '▼' : '▲';
+        const mono = `'JetBrains Mono','Fira Code','SF Mono','Roboto Mono',ui-monospace,monospace`;
+
+        // ── Palette per state ───────────────────────────────────────
+        const PAL = {
+            done:    { time:'#4ADE80', dot:'#22C55E', line:'#22C55E', glow:'rgba(34,197,94,0.45)',   badge:'rgba(74,222,128,0.14)',  bText:'#4ADE80'  },
+            fin:     { time:'#86EFAC', dot:'#22C55E', line:'#22C55E', glow:'rgba(34,197,94,0.6)',    badge:'rgba(134,239,172,0.17)', bText:'#86EFAC'  },
+            active:  { time:'#FCD34D', dot:'#FBBF24', line:'#FBBF24', glow:'rgba(251,191,36,0.55)',  badge:'rgba(252,211,77,0.14)',  bText:'#FCD34D'  },
+            pending: { time:'#2D3F52', dot:'#172030', line:'#172030', glow:'none',                    badge:'rgba(45,63,82,0.5)',     bText:'#3D5166'  },
+        };
 
         const rows = [];
 
@@ -1390,122 +1400,103 @@
             // ── Separator ──────────────────────────────────────────
             if (i === separatorIdx && separatorIdx > 0 && separatorIdx < hitos.length) {
                 rows.push(`
-                    <div style="display:flex;align-items:stretch;">
-                        <div style="width:52px;flex-shrink:0;"></div>
-                        <div style="width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;">
-                            <div style="width:3px;flex:1;background:#E2E8F0;"></div>
+                    <div style="display:flex;align-items:stretch;margin:4px 0;">
+                        <div style="width:56px;flex-shrink:0;"></div>
+                        <div style="width:40px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;">
+                            <div style="width:2px;flex:1;background:rgba(45,63,82,0.6);"></div>
                         </div>
-                        <div style="flex:1;display:flex;align-items:center;padding:2px 0 2px 14px;">
-                            <div style="flex:1;height:.5px;background:#E2E8F0;"></div>
-                            <span style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;padding:3px 10px;white-space:nowrap;border:.5px solid #E2E8F0;border-radius:20px;background:white;margin:0 8px;">Pendientes</span>
-                            <div style="flex:1;height:.5px;background:#E2E8F0;"></div>
+                        <div style="flex:1;display:flex;align-items:center;padding:0 0 0 12px;gap:8px;">
+                            <div style="flex:1;height:1px;background:rgba(45,63,82,0.4);"></div>
+                            <span style="font-family:${mono};font-size:8px;font-weight:700;letter-spacing:.18em;color:#2D3F52;white-space:nowrap;padding:3px 10px;border:1px solid rgba(45,63,82,0.5);border-radius:20px;">PENDIENTES</span>
+                            <div style="flex:1;height:1px;background:rgba(45,63,82,0.4);"></div>
                         </div>
                     </div>`);
             }
 
             const esProximo   = i === separatorIdx;
             const esPendiente = i > separatorIdx;
+            const pal = h.esFin && h.completado ? PAL.fin
+                      : h.completado             ? PAL.done
+                      : esProximo               ? PAL.active
+                      :                            PAL.pending;
 
-            // ── State config ────────────────────────────────────────
-            let accentColor, cardBg, cardBorderCSS, timeColor, badgeHTML, horaDisplay, horaLabel;
-            const refDisplay = h.horaRefEstimada || '—';
+            const refDisplay  = h.horaRefEstimada || '—';
+            const horaDisplay = h.completado ? (h.horaReal || '—')
+                              : (h.onLine || ultimoOnLine || '—');
+            const horaLabel   = h.completado ? 'REAL' : esProximo ? 'EST.' : 'PROY.';
 
-            if (h.esFin && h.completado) {
-                accentColor  = '#059669'; cardBg = '#F0FDF4';
-                cardBorderCSS = `border:.5px solid #A7F3D0;border-left:3px solid #059669;`;
-                timeColor    = '#065F46'; horaDisplay = h.horaReal; horaLabel = 'Real';
-                badgeHTML    = `<span style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;background:#D1FAE5;color:#065F46;text-transform:uppercase;letter-spacing:.05em;">Fin del batch</span>`;
-            } else if (h.esFin && !h.completado) {
-                accentColor  = '#10B981'; cardBg = '#F0FDF4';
-                cardBorderCSS = `border:.5px solid #A7F3D0;border-left:3px solid #10B981;`;
-                timeColor    = '#059669'; horaDisplay = ultimoOnLine; horaLabel = 'Est.';
-                badgeHTML    = `<span style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;background:#D1FAE5;color:#065F46;text-transform:uppercase;letter-spacing:.05em;">Fin del batch</span>`;
-            } else if (h.completado) {
-                accentColor  = '#2563EB'; cardBg = 'white';
-                cardBorderCSS = `border:.5px solid #BFDBFE;border-left:3px solid #2563EB;`;
-                timeColor    = '#1E40AF'; horaDisplay = h.horaReal; horaLabel = 'Real';
-                badgeHTML    = `<span style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;background:#DBEAFE;color:#1E40AF;text-transform:uppercase;letter-spacing:.05em;">Completado</span>`;
-            } else if (esProximo) {
-                accentColor  = '#2563EB'; cardBg = '#EFF6FF';
-                cardBorderCSS = `border:.5px solid #93C5FD;border-left:3px solid #2563EB;`;
-                timeColor    = '#2563EB'; horaDisplay = h.onLine || ultimoOnLine || '—'; horaLabel = 'Est.';
-                badgeHTML    = `<span style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;background:#DBEAFE;color:#2563EB;text-transform:uppercase;letter-spacing:.05em;">En curso</span>`;
-            } else {
-                accentColor  = '#CBD5E1'; cardBg = '#F8FAFC';
-                cardBorderCSS = `border:.5px solid #E2E8F0;border-left:3px solid #CBD5E1;`;
-                timeColor    = '#94A3B8'; horaDisplay = h.onLine || ultimoOnLine || '—'; horaLabel = 'Proy.';
-                badgeHTML    = `<span style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;background:#F1F5F9;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;">Pendiente</span>`;
-            }
+            // ── Badge ────────────────────────────────────────────────
+            const badgeText = h.esFin ? 'FIN DEL BATCH'
+                            : h.completado ? 'COMPLETADO'
+                            : esProximo    ? 'EN CURSO'
+                            :                'PENDIENTE';
+            const badgeHTML = `<span style="font-family:${mono};font-size:8px;font-weight:700;letter-spacing:.12em;padding:3px 9px;border-radius:4px;background:${pal.badge};color:${pal.bText};">${badgeText}</span>`;
 
-            // ── Delta badge ─────────────────────────────────────────
+            // ── Delta ────────────────────────────────────────────────
             let deltaHTML = '';
             if (h.incremento !== null) {
                 const inc = h.incremento;
-                const dC = inc <= 0 ? '#059669' : '#DC2626';
-                const dB = inc <= 0 ? '#DCFCE7'  : '#FEE2E2';
-                const dS = inc <= 0 ? '▼' : '▲';
-                deltaHTML = `<span style="font-family:${mono};font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:${dB};color:${dC};white-space:nowrap;">${dS} ${minToHuman(inc)}</span>`;
+                const dC  = inc <= 0 ? '#4ADE80' : '#FF6B6B';
+                const dB  = inc <= 0 ? 'rgba(74,222,128,0.12)' : 'rgba(255,107,107,0.12)';
+                const dS  = inc <= 0 ? '▼' : '▲';
+                deltaHTML = `<span style="font-family:${mono};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:4px;background:${dB};color:${dC};white-space:nowrap;">${dS} ${minToHuman(inc)}</span>`;
             } else if (esProximo) {
-                deltaHTML = `<span style="font-size:9.5px;padding:3px 8px;border-radius:6px;background:#DBEAFE;color:#2563EB;">en curso</span>`;
+                deltaHTML = `<span style="font-family:${mono};font-size:9px;padding:2px 8px;border-radius:4px;background:rgba(251,191,36,0.12);color:#FBBF24;">en curso</span>`;
             } else if (esPendiente) {
-                deltaHTML = `<span style="font-size:9.5px;padding:3px 8px;border-radius:6px;background:#F1F5F9;color:#94A3B8;">pendiente</span>`;
+                deltaHTML = `<span style="font-family:${mono};font-size:9px;padding:2px 8px;border-radius:4px;background:rgba(45,63,82,0.4);color:#2D3F52;">pendiente</span>`;
             }
 
-            // ── Dot ─────────────────────────────────────────────────
-            const dotFill   = h.completado ? accentColor : 'white';
-            const dotBorder = h.completado ? accentColor : esProximo ? accentColor : h.esFin ? '#10B981' : '#D1D5DB';
-            const dotShadow = esProximo     ? `0 0 0 5px ${accentColor}25,0 2px 10px ${accentColor}35`
-                            : h.completado  ? `0 2px 8px ${accentColor}30`
-                            :                  'none';
-            const checkSVG  = h.completado
-                ? `<svg width="13" height="13" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+            // ── Dot ──────────────────────────────────────────────────
+            const dotFill   = h.completado ? pal.dot : '#0C1219';
+            const dotBorder = pal.dot;
+            const dotShadow = h.completado  ? `0 0 0 3px rgba(34,197,94,0.18), 0 0 14px ${pal.glow}`
+                            : esProximo     ? `0 0 0 4px rgba(251,191,36,0.18), 0 0 18px ${pal.glow}`
+                            :                 'none';
+            const innerDot  = h.completado
+                ? `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#0C1219" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+                : esProximo
+                ? `<div style="width:8px;height:8px;border-radius:50%;background:#FBBF24;box-shadow:0 0 8px rgba(251,191,36,0.9);"></div>`
                 : '';
 
             // ── Lines ────────────────────────────────────────────────
-            const lineColorAbove = h.completado ? accentColor : '#E2E8F0';
-            const lineColorBelow = i === hitos.length - 1 ? 'transparent'
-                                 : hitos[i + 1]?.completado ? '#2563EB'
-                                 : '#E2E8F0';
+            const prevDone  = i > 0 && hitos[i - 1]?.completado;
+            const lineAbove = i === 0 ? 'transparent' : prevDone ? '#22C55E' : '#172030';
+            const lineBelow = i === hitos.length - 1 ? 'transparent' : h.completado ? pal.line : '#172030';
 
             const timeColDisplay = h.completado ? (h.horaReal || '') : (h.onLine || ultimoOnLine || '');
             const sqrLabel = h.sqr
-                ? `<span style="font-size:11px;color:#94A3B8;font-weight:400;margin-left:5px;">${h.sqr}</span>`
+                ? `<span style="font-family:${mono};font-size:9.5px;color:#2D3F52;margin-left:6px;">${h.sqr}</span>`
                 : '';
 
             rows.push(`
                 <div style="display:flex;align-items:stretch;">
-                    <!-- Time column -->
-                    <div style="width:52px;flex-shrink:0;text-align:right;padding-right:10px;padding-top:12px;">
-                        <span style="font-family:${mono};font-size:11.5px;font-weight:700;color:${h.completado ? accentColor : '#94A3B8'};letter-spacing:-.3px;line-height:1;">${timeColDisplay}</span>
+                    <div style="width:56px;flex-shrink:0;text-align:right;padding-right:12px;padding-top:15px;">
+                        <span style="font-family:${mono};font-size:12px;font-weight:700;color:${pal.time};letter-spacing:-.3px;">${timeColDisplay}</span>
                     </div>
-
-                    <!-- Connector -->
-                    <div style="width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;">
-                        <div style="width:4px;height:10px;background:${lineColorAbove};flex-shrink:0;border-radius:2px 2px 0 0;"></div>
-                        <div style="width:32px;height:32px;border-radius:50%;background:${dotFill};border:3px solid ${dotBorder};box-shadow:${dotShadow};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${checkSVG}</div>
-                        <div style="width:4px;flex:1;background:${lineColorBelow};border-radius:0 0 2px 2px;"></div>
+                    <div style="width:40px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;">
+                        <div style="width:2px;height:13px;background:${lineAbove};flex-shrink:0;"></div>
+                        <div style="width:28px;height:28px;border-radius:50%;background:${dotFill};border:2px solid ${dotBorder};box-shadow:${dotShadow};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${innerDot}</div>
+                        <div style="width:2px;flex:1;background:${lineBelow};"></div>
                     </div>
-
-                    <!-- Card -->
-                    <div style="flex:1;padding-left:12px;padding-bottom:10px;">
-                        <div style="${cardBorderCSS}border-radius:10px;padding:10px 13px;background:${cardBg};${esPendiente ? 'opacity:.6;' : ''}">
-                            <!-- Header row -->
+                    <div style="flex:1;padding-left:12px;padding-bottom:12px;">
+                        <div style="border-radius:8px;padding:10px 13px;background:rgba(255,255,255,${h.completado || esProximo ? '0.04' : '0.015'});border:1px solid rgba(255,255,255,${h.completado || esProximo ? '0.07' : '0.03'});${esPendiente ? 'opacity:.45;' : ''}">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                                <div style="font-size:13px;font-weight:700;color:${timeColor};">${h.id}${sqrLabel}</div>
+                                <div>
+                                    <span style="font-family:${mono};font-size:12px;font-weight:700;color:${pal.time};">${h.id}</span>${sqrLabel}
+                                </div>
                                 ${badgeHTML}
                             </div>
-                            <!-- Time display: BIG monospace Real → Ref + delta -->
-                            <div style="display:flex;align-items:flex-end;gap:0;">
+                            <div style="display:flex;align-items:baseline;gap:10px;">
                                 <div>
-                                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:2px;">${horaLabel}</div>
-                                    <div style="font-family:${mono};font-size:22px;font-weight:800;color:${timeColor};line-height:1;letter-spacing:-1.5px;">${horaDisplay}</div>
+                                    <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#1E293B;margin-bottom:2px;">${horaLabel}</div>
+                                    <div style="font-family:${mono};font-size:26px;font-weight:800;color:${pal.time};line-height:1;letter-spacing:-1.5px;${h.completado ? `text-shadow:0 0 18px ${pal.glow};` : ''}">${horaDisplay}</div>
                                 </div>
-                                <div style="padding:0 8px 3px;color:#D1D5DB;font-size:13px;">→</div>
+                                <div style="color:#334155;font-size:15px;padding-bottom:1px;align-self:flex-end;">→</div>
                                 <div>
-                                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:2px;">Ref.</div>
-                                    <div style="font-family:${mono};font-size:22px;font-weight:400;color:#CBD5E1;line-height:1;letter-spacing:-1.5px;">${refDisplay}</div>
+                                    <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#1E293B;margin-bottom:2px;">REF.</div>
+                                    <div style="font-family:${mono};font-size:26px;font-weight:400;color:#1E293B;line-height:1;letter-spacing:-1.5px;">${refDisplay}</div>
                                 </div>
-                                <div style="margin-left:auto;padding-bottom:2px;">${deltaHTML}</div>
+                                <div style="margin-left:auto;align-self:flex-end;padding-bottom:2px;">${deltaHTML}</div>
                             </div>
                         </div>
                     </div>
@@ -1516,48 +1507,48 @@
             weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
         });
 
-        return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-            <!-- Compact header: date + On Line -->
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #F1F5F9;">
-                <span style="font-size:11px;color:#94A3B8;">${fechaLabel}</span>
-                <div style="display:flex;align-items:baseline;gap:6px;">
-                    <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;">On Line</span>
-                    <span style="font-family:${mono};font-size:22px;font-weight:800;color:#1E40AF;letter-spacing:-1px;">${ultimoOnLine}</span>
-                </div>
+        return `
+        <div style="font-family:${mono};display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
+            <div>
+                <div style="font-size:8px;font-weight:700;letter-spacing:.16em;color:#1E293B;text-transform:uppercase;margin-bottom:4px;">FECHA</div>
+                <div style="font-size:11px;color:#334155;">${fechaLabel}</div>
             </div>
-
-            <!-- Metrics strip (gap-grid layout) -->
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#E2E8F0;border-radius:10px;overflow:hidden;margin-bottom:14px;">
-                <div style="background:white;padding:9px 13px;">
-                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:3px;">Completados</div>
-                    <div style="font-size:16px;font-weight:700;color:#0F172A;line-height:1;">${nCompletados}<span style="font-size:11px;color:#CBD5E1;font-weight:400;"> /${hitos.length}</span></div>
-                </div>
-                <div style="background:white;padding:9px 13px;">
-                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:3px;">On Line</div>
-                    <div style="font-family:${mono};font-size:16px;font-weight:700;color:#1E40AF;letter-spacing:-.5px;line-height:1;">${ultimoOnLine}</div>
-                </div>
-                <div style="background:white;padding:9px 13px;">
-                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:3px;">Variación</div>
-                    <div style="font-family:${mono};font-size:16px;font-weight:700;color:${varColor};letter-spacing:-.5px;line-height:1;">${varSymbol} ${minToHuman(Math.abs(varAcum))}</div>
-                </div>
-                <div style="background:white;padding:9px 13px;">
-                    <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:3px;">Avance</div>
-                    <div style="font-size:16px;font-weight:700;color:#0F172A;line-height:1;">${pctCompletado}%</div>
-                    <div style="height:3px;background:#F1F5F9;border-radius:2px;margin-top:5px;"><div style="height:3px;background:#2563EB;border-radius:2px;width:${pctCompletado}%;"></div></div>
-                </div>
+            <div style="text-align:right;">
+                <div style="font-size:8px;font-weight:700;letter-spacing:.16em;color:#1E293B;text-transform:uppercase;margin-bottom:4px;">ON LINE ESTIMADO</div>
+                <div style="font-family:${mono};font-size:34px;font-weight:800;color:#4ADE80;letter-spacing:-2px;line-height:1;text-shadow:0 0 24px rgba(74,222,128,0.55);">${ultimoOnLine}</div>
             </div>
+        </div>
 
-            ${procesoActivo ? `
-            <div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:8px 13px;display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-                <div style="width:6px;height:6px;border-radius:50%;background:#0EA5E9;flex-shrink:0;box-shadow:0 0 0 3px #BAE6FD;"></div>
-                <span style="font-size:11.5px;font-weight:600;color:#0369A1;">Último registrado — ${procesoActivo.sqr || procesoActivo.proceso}</span>
-                <span style="font-size:11px;color:#7DD3FC;margin-left:2px;">· Fin ${formatHora(procesoActivo.fechaFinReal)} · On Line ~${ultimoOnLine}</span>
-            </div>` : ''}
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px 12px;">
+                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.14em;color:#1E293B;margin-bottom:5px;">COMPLETADOS</div>
+                <div style="font-family:${mono};font-size:18px;font-weight:800;color:#F8FAFC;line-height:1;">${nCompletados}<span style="font-size:11px;color:#334155;font-weight:400;"> /${hitos.length}</span></div>
+            </div>
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px 12px;">
+                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.14em;color:#1E293B;margin-bottom:5px;">ON LINE</div>
+                <div style="font-family:${mono};font-size:18px;font-weight:800;color:#4ADE80;line-height:1;text-shadow:0 0 14px rgba(74,222,128,0.5);">${ultimoOnLine}</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px 12px;">
+                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.14em;color:#1E293B;margin-bottom:5px;">VARIACIÓN</div>
+                <div style="font-family:${mono};font-size:18px;font-weight:800;color:${varColor};line-height:1;">${varSymbol} ${minToHuman(varAcumAbs)}</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px 12px;">
+                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.14em;color:#1E293B;margin-bottom:5px;">AVANCE</div>
+                <div style="font-family:${mono};font-size:18px;font-weight:800;color:#F8FAFC;line-height:1;">${pctCompletado}%</div>
+                <div style="height:3px;background:#172030;border-radius:2px;margin-top:6px;"><div style="height:3px;background:linear-gradient(90deg,#22C55E,#4ADE80);border-radius:2px;width:${pctCompletado}%;box-shadow:0 0 8px rgba(74,222,128,0.6);"></div></div>
+            </div>
+        </div>
 
-            <!-- Hito list -->
-            <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#CBD5E1;margin-bottom:8px;padding-left:52px;">Hitos del camino crítico</div>
-            ${rows.join('')}
-        </div>`;
+        ${procesoActivo ? `
+        <div style="background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.18);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#FBBF24;flex-shrink:0;box-shadow:0 0 10px rgba(251,191,36,0.9);"></div>
+            <span style="font-family:${mono};font-size:10.5px;font-weight:700;color:#FCD34D;">ÚLTIMO: ${procesoActivo.sqr || procesoActivo.proceso}</span>
+            <span style="font-family:${mono};font-size:9.5px;color:#334155;margin-left:4px;">Fin ${formatHora(procesoActivo.fechaFinReal)} · On Line ~${ultimoOnLine}</span>
+        </div>` : ''}
+
+        <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.18em;color:#172030;margin-bottom:8px;padding-left:96px;">HITOS DEL CAMINO CRÍTICO</div>
+
+        ${rows.join('')}`;
     };
 
     // ─────────────────────────────────────────────
