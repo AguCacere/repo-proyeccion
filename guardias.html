@@ -372,6 +372,8 @@
         .cc-table tbody tr.row-missing { background: #FAFAFA; }
         .cc-table tbody tr.row-missing td { color: #9CA3AF; }
         .cc-table tbody tr.row-missing:hover { background: #F3F4F6; }
+        .cc-table tbody tr.row-sin-referencia { background: #FFFBEB; }
+        .cc-table tbody tr.row-sin-referencia:hover { background: #FEF3C7; }
 
         /* Cell states */
         .cell-error { color: #dc2626; font-weight: 600; }
@@ -422,6 +424,17 @@
             padding: 2px 7px;
             background: #F1F5F9;
             color: #94A3B8;
+            border-radius: 20px;
+            font-size: 0.67rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+        }
+        .badge-sin-ref {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            background: #FEF3C7;
+            color: #B45309;
             border-radius: 20px;
             font-size: 0.67rem;
             font-weight: 600;
@@ -1002,17 +1015,19 @@
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
+                // Normalize headers: strip accents, lowercase, underscores → robust against any casing/encoding
+                transformHeader: h => h.trim()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase().replace(/\s+/g, '_'),
                 complete: (results) => {
                     resolve(results.data.map(r => ({
-                        // Accept both export formats: "Proceso" (Bitácora) and "Comando Codigo" (legacy)
                         comandoCodigo: String(
-                            r['Proceso'] || r['Comando Codigo'] || r['ComandoCodigo'] || ''
+                            r['proceso'] || r['comando_codigo'] || r['comandocodigo'] || ''
                         ).trim(),
-                        fechaInicio: r['Fecha Inicio'],
-                        fechaFin:    r['Fecha Fin'],
-                        // Accept with or without accent on the u
-                        duracion:    r['Duración'] || r['Duracion'],
-                        estado:      r['Estado']
+                        fechaInicio: r['fecha_inicio'],
+                        fechaFin:    r['fecha_fin'],
+                        duracion:    r['duracion'],
+                        estado:      r['estado']
                     })));
                 },
                 error: (err) => reject(new Error('Error al leer el CSV: ' + err.message))
@@ -1117,7 +1132,7 @@
         });
 
         // Calculate Wait: inicio siguiente − fin actual (minutes)
-        return rows.map((row, i, arr) => {
+        const mainRows = rows.map((row, i, arr) => {
             const siguiente      = arr[i + 1];
             const finActual       = row.fechaFinReal            ? csvDate(row.fechaFinReal)            : null;
             const inicioSiguiente = siguiente?.fechaInicioReal ? csvDate(siguiente.fechaInicioReal) : null;
@@ -1129,6 +1144,43 @@
 
             return { ...row, wait: waitMin };
         });
+
+        // ── Extra: CSV ERROR rows not present in the comparativo ──────────
+        // These processes ran with errors but aren't tracked in the reference sheet.
+        const matchedProcesos = new Set(comparativo.map(r => String(r.proceso).trim()));
+        const unmatchedMap = {};
+        probatch.forEach(r => {
+            if (r.comandoCodigo && !matchedProcesos.has(r.comandoCodigo)) {
+                if (!unmatchedMap[r.comandoCodigo]) unmatchedMap[r.comandoCodigo] = [];
+                unmatchedMap[r.comandoCodigo].push(r);
+            }
+        });
+
+        const extraRows = Object.entries(unmatchedMap)
+            .filter(([, runs]) => runs.some(r => String(r.estado).toUpperCase() === 'ERROR'))
+            .map(([codigo, runs]) => {
+                const byStart  = runs.slice().sort((a, b) => new Date(a.fechaInicio) - new Date(b.fechaInicio));
+                const byEnd    = runs.slice().sort((a, b) => new Date(b.fechaFin)    - new Date(a.fechaFin));
+                const hasError = runs.some(r => String(r.estado).toUpperCase() === 'ERROR');
+                const totalMs  = new Date(byEnd[0].fechaFin) - new Date(byStart[0].fechaInicio);
+                const totalMin = totalMs > 0 ? totalMs / 60000 : 0;
+                return {
+                    instancia: null, lote: null,
+                    proceso:   codigo,
+                    sqr:       '—',
+                    duracionRef: null, fechaInicioRef: null, fechaFinRef: null, faltaBatch: null,
+                    fechaInicioReal: byStart[0].fechaInicio,
+                    fechaFinReal:    byEnd[0].fechaFin,
+                    duracionReal:    runs.length > 1 ? minToHHMM(totalMin) : runs[0].duracion,
+                    estado:          hasError ? 'ERROR' : byEnd[0].estado,
+                    onLine: null, deberiaFinalizar: null, incremento: null,
+                    encontrado: true, wait: null,
+                    sinReferencia: true   // flag: not in comparativo
+                };
+            })
+            .sort((a, b) => new Date(a.fechaInicioReal) - new Date(b.fechaInicioReal));
+
+        return [...mainRows, ...extraRows];
     }
 
     // ─────────────────────────────────────────────
@@ -1211,8 +1263,9 @@
         const isMissing = !row.encontrado;
 
         let rowStateClass = '';
-        if (isError)        rowStateClass = 'row-error';
-        else if (isMissing) rowStateClass = 'row-missing';
+        if (row.sinReferencia) rowStateClass = 'row-sin-referencia';
+        else if (isError)      rowStateClass = 'row-error';
+        else if (isMissing)    rowStateClass = 'row-missing';
 
         // Estado cell — pill badge
         let estadoCell;
@@ -1225,8 +1278,10 @@
             estadoCell = `<td><span class="badge-estado badge-estado-none">—</span></td>`;
         }
 
-        // Proceso cell — badge if no data
-        const procesoCell = isMissing
+        // Proceso cell — badge if no data or not in reference
+        const procesoCell = row.sinReferencia
+            ? `<td>${escHtml(row.proceso)} <span class="badge-sin-ref" title="Este proceso no está en el comparativo de referencia">fuera ref.</span></td>`
+            : isMissing
             ? `<td>${escHtml(row.proceso)} <span class="badge-missing">Sin datos</span></td>`
             : `<td>${escHtml(row.proceso)}</td>`;
 
