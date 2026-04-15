@@ -742,10 +742,10 @@
 
     <!-- Timeline modal -->
     <div id="timelineOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.45);z-index:999;align-items:center;justify-content:center;">
-        <div style="background:#0C1219;border-radius:16px;width:600px;max-height:90vh;overflow-y:auto;padding:20px 24px;position:relative;z-index:1000;box-shadow:0 24px 80px rgba(0,0,0,0.65),0 4px 24px rgba(0,0,0,0.4);margin:0 20px;border:1px solid rgba(255,255,255,0.07);">
+        <div style="background:white;border-radius:16px;width:600px;max-height:90vh;overflow-y:auto;padding:20px 24px;position:relative;z-index:1000;box-shadow:0 20px 60px rgba(0,0,0,0.12),0 4px 16px rgba(0,0,0,0.06);margin:0 20px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                <span style="font-family:'JetBrains Mono','Fira Code',monospace;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#334155;">LÍNEA DE TIEMPO</span>
-                <button onclick="cerrarTimeline()" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);font-size:13px;cursor:pointer;color:#475569;border-radius:6px;padding:5px 10px;line-height:1;transition:background 150ms;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">✕</button>
+                <span style="font-family:'JetBrains Mono','Fira Code',monospace;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#6B7280;">LÍNEA DE TIEMPO</span>
+                <button onclick="cerrarTimeline()" style="background:#F9FAFB;border:1px solid #E5E7EB;font-size:13px;cursor:pointer;color:#6B7280;border-radius:6px;padding:5px 10px;line-height:1;transition:background 150ms;" onmouseover="this.style.background='#F3F4F6'" onmouseout="this.style.background='#F9FAFB'">✕</button>
             </div>
             <div id="timelineContenido"></div>
         </div>
@@ -1382,16 +1382,16 @@
         const procesoActivo = [...filas].reverse().find(f => f.fechaInicioReal && f.fechaFinReal);
 
         const varAcumAbs = Math.abs(varAcum);
-        const varColor   = varAcum <= 0 ? '#4ADE80' : '#FF6B6B';
+        const varColor   = varAcum <= 0 ? '#059669' : '#DC2626';
         const varSymbol  = varAcum <= 0 ? '▼' : '▲';
         const mono = `'JetBrains Mono','Fira Code','SF Mono','Roboto Mono',ui-monospace,monospace`;
 
-        // ── Palette per state ───────────────────────────────────────
+        // ── Palette per state (light theme) ────────────────────────
         const PAL = {
-            done:    { time:'#4ADE80', dot:'#22C55E', line:'#22C55E', glow:'rgba(34,197,94,0.45)',   badge:'rgba(74,222,128,0.14)',  bText:'#4ADE80'  },
-            fin:     { time:'#86EFAC', dot:'#22C55E', line:'#22C55E', glow:'rgba(34,197,94,0.6)',    badge:'rgba(134,239,172,0.17)', bText:'#86EFAC'  },
-            active:  { time:'#FCD34D', dot:'#FBBF24', line:'#FBBF24', glow:'rgba(251,191,36,0.55)',  badge:'rgba(252,211,77,0.14)',  bText:'#FCD34D'  },
-            pending: { time:'#2D3F52', dot:'#172030', line:'#172030', glow:'none',                    badge:'rgba(45,63,82,0.5)',     bText:'#3D5166'  },
+            done:    { time:'#1E293B', dot:'#1D4ED8', line:'#3B82F6', badge:'#DBEAFE', bText:'#1E40AF', cardBg:'white',   cardBorder:'border:.5px solid #BFDBFE;border-left:3px solid #1D4ED8;' },
+            fin:     { time:'#064E3B', dot:'#059669', line:'#10B981', badge:'#D1FAE5', bText:'#065F46', cardBg:'#F0FDF4', cardBorder:'border:.5px solid #A7F3D0;border-left:3px solid #059669;' },
+            active:  { time:'#92400E', dot:'#F59E0B', line:'#FBBF24', badge:'#FEF3C7', bText:'#B45309', cardBg:'#FFFBEB', cardBorder:'border:.5px solid #FDE68A;border-left:3px solid #F59E0B;' },
+            pending: { time:'#94A3B8', dot:'#E2E8F0', line:'#E2E8F0', badge:'#F1F5F9', bText:'#94A3B8', cardBg:'#F8FAFC', cardBorder:'border:.5px solid #E2E8F0;border-left:3px solid #E2E8F0;' },
         };
 
         const rows = [];
@@ -1403,12 +1403,12 @@
                     <div style="display:flex;align-items:stretch;margin:4px 0;">
                         <div style="width:56px;flex-shrink:0;"></div>
                         <div style="width:40px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;">
-                            <div style="width:2px;flex:1;background:rgba(45,63,82,0.6);"></div>
+                            <div style="width:2px;flex:1;background:#E2E8F0;"></div>
                         </div>
                         <div style="flex:1;display:flex;align-items:center;padding:0 0 0 12px;gap:8px;">
-                            <div style="flex:1;height:1px;background:rgba(45,63,82,0.4);"></div>
-                            <span style="font-family:${mono};font-size:8px;font-weight:700;letter-spacing:.18em;color:#2D3F52;white-space:nowrap;padding:3px 10px;border:1px solid rgba(45,63,82,0.5);border-radius:20px;">PENDIENTES</span>
-                            <div style="flex:1;height:1px;background:rgba(45,63,82,0.4);"></div>
+                            <div style="flex:1;height:1px;background:#E2E8F0;"></div>
+                            <span style="font-family:${mono};font-size:8px;font-weight:700;letter-spacing:.18em;color:#94A3B8;white-space:nowrap;padding:3px 10px;border:1px solid #E2E8F0;border-radius:20px;background:white;">PENDIENTES</span>
+                            <div style="flex:1;height:1px;background:#E2E8F0;"></div>
                         </div>
                     </div>`);
             }
@@ -1436,36 +1436,36 @@
             let deltaHTML = '';
             if (h.incremento !== null) {
                 const inc = h.incremento;
-                const dC  = inc <= 0 ? '#4ADE80' : '#FF6B6B';
-                const dB  = inc <= 0 ? 'rgba(74,222,128,0.12)' : 'rgba(255,107,107,0.12)';
+                const dC  = inc <= 0 ? '#059669' : '#DC2626';
+                const dB  = inc <= 0 ? '#DCFCE7'  : '#FEE2E2';
                 const dS  = inc <= 0 ? '▼' : '▲';
                 deltaHTML = `<span style="font-family:${mono};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:4px;background:${dB};color:${dC};white-space:nowrap;">${dS} ${minToHuman(inc)}</span>`;
             } else if (esProximo) {
-                deltaHTML = `<span style="font-family:${mono};font-size:9px;padding:2px 8px;border-radius:4px;background:rgba(251,191,36,0.12);color:#FBBF24;">en curso</span>`;
+                deltaHTML = `<span style="font-family:${mono};font-size:9px;padding:2px 8px;border-radius:4px;background:#FEF3C7;color:#B45309;">en curso</span>`;
             } else if (esPendiente) {
-                deltaHTML = `<span style="font-family:${mono};font-size:9px;padding:2px 8px;border-radius:4px;background:rgba(45,63,82,0.4);color:#2D3F52;">pendiente</span>`;
+                deltaHTML = `<span style="font-family:${mono};font-size:9px;padding:2px 8px;border-radius:4px;background:#F1F5F9;color:#94A3B8;">pendiente</span>`;
             }
 
             // ── Dot ──────────────────────────────────────────────────
-            const dotFill   = h.completado ? pal.dot : '#0C1219';
-            const dotBorder = pal.dot;
-            const dotShadow = h.completado  ? `0 0 0 3px rgba(34,197,94,0.18), 0 0 14px ${pal.glow}`
-                            : esProximo     ? `0 0 0 4px rgba(251,191,36,0.18), 0 0 18px ${pal.glow}`
+            const dotFill   = h.completado ? pal.dot : 'white';
+            const dotBorder = h.completado ? pal.dot : esProximo ? '#F59E0B' : '#E2E8F0';
+            const dotShadow = h.completado  ? `0 2px 8px rgba(29,78,216,0.2)`
+                            : esProximo     ? `0 0 0 4px #FEF3C7`
                             :                 'none';
             const innerDot  = h.completado
-                ? `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#0C1219" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+                ? `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
                 : esProximo
-                ? `<div style="width:8px;height:8px;border-radius:50%;background:#FBBF24;box-shadow:0 0 8px rgba(251,191,36,0.9);"></div>`
+                ? `<div style="width:8px;height:8px;border-radius:50%;background:#F59E0B;"></div>`
                 : '';
 
             // ── Lines ────────────────────────────────────────────────
             const prevDone  = i > 0 && hitos[i - 1]?.completado;
-            const lineAbove = i === 0 ? 'transparent' : prevDone ? '#22C55E' : '#172030';
-            const lineBelow = i === hitos.length - 1 ? 'transparent' : h.completado ? pal.line : '#172030';
+            const lineAbove = i === 0 ? 'transparent' : prevDone ? '#3B82F6' : '#E2E8F0';
+            const lineBelow = i === hitos.length - 1 ? 'transparent' : h.completado ? pal.line : '#E2E8F0';
 
             const timeColDisplay = h.completado ? (h.horaReal || '') : (h.onLine || ultimoOnLine || '');
             const sqrLabel = h.sqr
-                ? `<span style="font-family:${mono};font-size:9.5px;color:#2D3F52;margin-left:6px;">${h.sqr}</span>`
+                ? `<span style="font-family:${mono};font-size:9.5px;color:#94A3B8;margin-left:6px;">${h.sqr}</span>`
                 : '';
 
             rows.push(`
@@ -1479,7 +1479,7 @@
                         <div style="width:2px;flex:1;background:${lineBelow};"></div>
                     </div>
                     <div style="flex:1;padding-left:12px;padding-bottom:12px;">
-                        <div style="border-radius:8px;padding:10px 13px;background:rgba(255,255,255,${h.completado || esProximo ? '0.04' : '0.015'});border:1px solid rgba(255,255,255,${h.completado || esProximo ? '0.07' : '0.03'});${esPendiente ? 'opacity:.45;' : ''}">
+                        <div style="${pal.cardBorder}border-radius:8px;padding:10px 13px;background:${pal.cardBg};${esPendiente ? 'opacity:.55;' : ''}">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                                 <div>
                                     <span style="font-family:${mono};font-size:12px;font-weight:700;color:${pal.time};">${h.id}</span>${sqrLabel}
@@ -1488,13 +1488,13 @@
                             </div>
                             <div style="display:flex;align-items:baseline;gap:10px;">
                                 <div>
-                                    <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#1E293B;margin-bottom:2px;">${horaLabel}</div>
-                                    <div style="font-family:${mono};font-size:26px;font-weight:800;color:${pal.time};line-height:1;letter-spacing:-1.5px;${h.completado ? `text-shadow:0 0 18px ${pal.glow};` : ''}">${horaDisplay}</div>
+                                    <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:2px;">${horaLabel}</div>
+                                    <div style="font-family:${mono};font-size:26px;font-weight:800;color:${pal.time};line-height:1;letter-spacing:-1.5px;">${horaDisplay}</div>
                                 </div>
-                                <div style="color:#334155;font-size:15px;padding-bottom:1px;align-self:flex-end;">→</div>
+                                <div style="color:#CBD5E1;font-size:15px;padding-bottom:1px;align-self:flex-end;">→</div>
                                 <div>
-                                    <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#1E293B;margin-bottom:2px;">REF.</div>
-                                    <div style="font-family:${mono};font-size:26px;font-weight:400;color:#1E293B;line-height:1;letter-spacing:-1.5px;">${refDisplay}</div>
+                                    <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:2px;">REF.</div>
+                                    <div style="font-family:${mono};font-size:26px;font-weight:400;color:#CBD5E1;line-height:1;letter-spacing:-1.5px;">${refDisplay}</div>
                                 </div>
                                 <div style="margin-left:auto;align-self:flex-end;padding-bottom:2px;">${deltaHTML}</div>
                             </div>
@@ -1508,45 +1508,45 @@
         });
 
         return `
-        <div style="font-family:${mono};display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
+        <div style="font-family:${mono};display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #F1F5F9;">
             <div>
-                <div style="font-size:8px;font-weight:700;letter-spacing:.16em;color:#1E293B;text-transform:uppercase;margin-bottom:4px;">FECHA</div>
-                <div style="font-size:11px;color:#334155;">${fechaLabel}</div>
+                <div style="font-size:8px;font-weight:700;letter-spacing:.14em;color:#94A3B8;text-transform:uppercase;margin-bottom:4px;">FECHA</div>
+                <div style="font-size:11px;color:#64748B;">${fechaLabel}</div>
             </div>
             <div style="text-align:right;">
-                <div style="font-size:8px;font-weight:700;letter-spacing:.16em;color:#1E293B;text-transform:uppercase;margin-bottom:4px;">ON LINE ESTIMADO</div>
-                <div style="font-family:${mono};font-size:34px;font-weight:800;color:#4ADE80;letter-spacing:-2px;line-height:1;text-shadow:0 0 24px rgba(74,222,128,0.55);">${ultimoOnLine}</div>
+                <div style="font-size:8px;font-weight:700;letter-spacing:.14em;color:#94A3B8;text-transform:uppercase;margin-bottom:4px;">ON LINE ESTIMADO</div>
+                <div style="font-family:${mono};font-size:32px;font-weight:800;color:#0F172A;letter-spacing:-2px;line-height:1;">${ultimoOnLine}</div>
             </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
-            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px 12px;">
-                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.14em;color:#1E293B;margin-bottom:5px;">COMPLETADOS</div>
-                <div style="font-family:${mono};font-size:18px;font-weight:800;color:#F8FAFC;line-height:1;">${nCompletados}<span style="font-size:11px;color:#334155;font-weight:400;"> /${hitos.length}</span></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#E2E8F0;border-radius:10px;overflow:hidden;margin-bottom:14px;">
+            <div style="background:#FAFAFA;padding:9px 12px;">
+                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:4px;">COMPLETADOS</div>
+                <div style="font-family:${mono};font-size:17px;font-weight:800;color:#0F172A;line-height:1;">${nCompletados}<span style="font-size:11px;color:#CBD5E1;font-weight:400;"> /${hitos.length}</span></div>
             </div>
-            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px 12px;">
-                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.14em;color:#1E293B;margin-bottom:5px;">ON LINE</div>
-                <div style="font-family:${mono};font-size:18px;font-weight:800;color:#4ADE80;line-height:1;text-shadow:0 0 14px rgba(74,222,128,0.5);">${ultimoOnLine}</div>
+            <div style="background:#FAFAFA;padding:9px 12px;">
+                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:4px;">ON LINE</div>
+                <div style="font-family:${mono};font-size:17px;font-weight:800;color:#0F172A;line-height:1;">${ultimoOnLine}</div>
             </div>
-            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px 12px;">
-                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.14em;color:#1E293B;margin-bottom:5px;">VARIACIÓN</div>
-                <div style="font-family:${mono};font-size:18px;font-weight:800;color:${varColor};line-height:1;">${varSymbol} ${minToHuman(varAcumAbs)}</div>
+            <div style="background:#FAFAFA;padding:9px 12px;">
+                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:4px;">VARIACIÓN</div>
+                <div style="font-family:${mono};font-size:17px;font-weight:800;color:${varColor};line-height:1;">${varSymbol} ${minToHuman(varAcumAbs)}</div>
             </div>
-            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px 12px;">
-                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.14em;color:#1E293B;margin-bottom:5px;">AVANCE</div>
-                <div style="font-family:${mono};font-size:18px;font-weight:800;color:#F8FAFC;line-height:1;">${pctCompletado}%</div>
-                <div style="height:3px;background:#172030;border-radius:2px;margin-top:6px;"><div style="height:3px;background:linear-gradient(90deg,#22C55E,#4ADE80);border-radius:2px;width:${pctCompletado}%;box-shadow:0 0 8px rgba(74,222,128,0.6);"></div></div>
+            <div style="background:#FAFAFA;padding:9px 12px;">
+                <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:4px;">AVANCE</div>
+                <div style="font-family:${mono};font-size:17px;font-weight:800;color:#0F172A;line-height:1;">${pctCompletado}%</div>
+                <div style="height:3px;background:#E2E8F0;border-radius:2px;margin-top:5px;"><div style="height:3px;background:#3B82F6;border-radius:2px;width:${pctCompletado}%;"></div></div>
             </div>
         </div>
 
         ${procesoActivo ? `
-        <div style="background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.18);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-            <div style="width:6px;height:6px;border-radius:50%;background:#FBBF24;flex-shrink:0;box-shadow:0 0 10px rgba(251,191,36,0.9);"></div>
-            <span style="font-family:${mono};font-size:10.5px;font-weight:700;color:#FCD34D;">ÚLTIMO: ${procesoActivo.sqr || procesoActivo.proceso}</span>
-            <span style="font-family:${mono};font-size:9.5px;color:#334155;margin-left:4px;">Fin ${formatHora(procesoActivo.fechaFinReal)} · On Line ~${ultimoOnLine}</span>
+        <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#F59E0B;flex-shrink:0;box-shadow:0 0 0 3px #FEF3C7;"></div>
+            <span style="font-family:${mono};font-size:10.5px;font-weight:700;color:#92400E;">ÚLTIMO: ${procesoActivo.sqr || procesoActivo.proceso}</span>
+            <span style="font-family:${mono};font-size:9.5px;color:#D97706;margin-left:4px;">Fin ${formatHora(procesoActivo.fechaFinReal)} · On Line ~${ultimoOnLine}</span>
         </div>` : ''}
 
-        <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.18em;color:#172030;margin-bottom:8px;padding-left:96px;">HITOS DEL CAMINO CRÍTICO</div>
+        <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.16em;color:#CBD5E1;margin-bottom:8px;padding-left:96px;">HITOS DEL CAMINO CRÍTICO</div>
 
         ${rows.join('')}`;
     };
