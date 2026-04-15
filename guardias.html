@@ -1004,11 +1004,15 @@
                 skipEmptyLines: true,
                 complete: (results) => {
                     resolve(results.data.map(r => ({
-                        comandoCodigo: String(r['Comando Codigo'] || r['ComandoCodigo'] || '').trim(),
-                        fechaInicio:   r['Fecha Inicio'],
-                        fechaFin:      r['Fecha Fin'],
-                        duracion:      r['Duracion'],
-                        estado:        r['Estado']
+                        // Accept both export formats: "Proceso" (Bitácora) and "Comando Codigo" (legacy)
+                        comandoCodigo: String(
+                            r['Proceso'] || r['Comando Codigo'] || r['ComandoCodigo'] || ''
+                        ).trim(),
+                        fechaInicio: r['Fecha Inicio'],
+                        fechaFin:    r['Fecha Fin'],
+                        // Accept with or without accent on the u
+                        duracion:    r['Duración'] || r['Duracion'],
+                        estado:      r['Estado']
                     })));
                 },
                 error: (err) => reject(new Error('Error al leer el CSV: ' + err.message))
@@ -1043,8 +1047,10 @@
         const rows = comparativo.map((ref) => {
             const matches = probatchMap[ref.proceso] || [];
 
-            // If multiple rows match, take the one with the latest Fecha Fin
-            const real = matches
+            // Prefer OK runs over ERROR runs; within each group take the latest Fecha Fin
+            const okRuns  = matches.filter(r => String(r.estado).toUpperCase() === 'OK');
+            const pool    = okRuns.length > 0 ? okRuns : matches;
+            const real    = pool
                 .slice()
                 .sort((a, b) => new Date(b.fechaFin) - new Date(a.fechaFin))[0] || null;
 
