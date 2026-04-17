@@ -300,6 +300,9 @@
         .rp-stat.exec    { background: #EFF6FF; color: #1D4ED8; }
         .rp-stat.delayed { background: #FEF2F2; color: #DC2626; }
         .rp-stat.fast    { background: #F0FDF4; color: #15803D; }
+        .rp-stat.err     { background: #FEE2E2; color: #B91C1C; }
+        .rp-stat.nodata  { background: #F1F5F9; color: #64748B; }
+        .rp-stat.fuera   { background: #FEF3C7; color: #92400E; }
 
         /* ── Table wrapper ── */
         .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -372,6 +375,8 @@
         .cc-table tbody tr.row-missing { background: #FAFAFA; }
         .cc-table tbody tr.row-missing td { color: #9CA3AF; }
         .cc-table tbody tr.row-missing:hover { background: #F3F4F6; }
+        .cc-table tbody tr.row-sin-referencia { background: #FFFBEB; }
+        .cc-table tbody tr.row-sin-referencia:hover { background: #FEF3C7; }
 
         /* Cell states */
         .cell-error { color: #dc2626; font-weight: 600; }
@@ -400,6 +405,39 @@
             font-variant-numeric: tabular-nums;
         }
 
+        /* Inc-badge variants (Δ Duración) */
+        .inc-badge {
+            display: inline-flex; align-items: center; gap: 2px;
+            padding: 2px 7px; border-radius: 6px;
+            font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+        }
+        .inc-pos  { background: #FEF2F2; color: #DC2626; }
+        .inc-neg  { background: #F0FDF4; color: #15803D; }
+        .inc-zero { background: #F1F5F9; color: #64748B; }
+
+        /* Retries badge */
+        .badge-retries {
+            display: inline-flex; align-items: center;
+            padding: 1px 6px; border-radius: 20px;
+            background: #FEE2E2; color: #B91C1C;
+            font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em;
+            margin-left: 4px; vertical-align: middle;
+        }
+
+        /* Section separator row */
+        .cc-section-sep td {
+            padding: 5px 12px;
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.08em; color: #92400E;
+            background: #FFFBEB; border-top: 1px dashed #FCD34D;
+            border-bottom: 1px dashed #FCD34D;
+        }
+
+        /* Table cell utilities */
+        .td-mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; }
+        .td-r    { text-align: right; }
+        .td-dim  { color: #94A3B8; }
+
         /* Estado badges */
         .badge-estado {
             display: inline-flex;
@@ -422,6 +460,17 @@
             padding: 2px 7px;
             background: #F1F5F9;
             color: #94A3B8;
+            border-radius: 20px;
+            font-size: 0.67rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+        }
+        .badge-sin-ref {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            background: #FEF3C7;
+            color: #B45309;
             border-radius: 20px;
             font-size: 0.67rem;
             font-weight: 600;
@@ -1002,13 +1051,19 @@
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
+                // Normalize headers: strip accents, lowercase, underscores → robust against any casing/encoding
+                transformHeader: h => h.trim()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase().replace(/\s+/g, '_'),
                 complete: (results) => {
                     resolve(results.data.map(r => ({
-                        comandoCodigo: String(r['Comando Codigo'] || r['ComandoCodigo'] || '').trim(),
-                        fechaInicio:   r['Fecha Inicio'],
-                        fechaFin:      r['Fecha Fin'],
-                        duracion:      r['Duracion'],
-                        estado:        r['Estado']
+                        comandoCodigo: String(
+                            r['proceso'] || r['comando_codigo'] || r['comandocodigo'] || ''
+                        ).trim(),
+                        fechaInicio: r['fecha_inicio'],
+                        fechaFin:    r['fecha_fin'],
+                        duracion:    r['duracion'],
+                        estado:      r['estado']
                     })));
                 },
                 error: (err) => reject(new Error('Error al leer el CSV: ' + err.message))
@@ -1043,10 +1098,33 @@
         const rows = comparativo.map((ref) => {
             const matches = probatchMap[ref.proceso] || [];
 
-            // If multiple rows match, take the one with the latest Fecha Fin
-            const real = matches
-                .slice()
-                .sort((a, b) => new Date(b.fechaFin) - new Date(a.fechaFin))[0] || null;
+            // Build representative run from all attempts for this proceso:
+            // • fechaInicio : earliest start (first attempt, including retries)
+            // • fechaFin    : latest end    (last attempt)
+            // • estado      : ERROR if any run had ERROR; OK only if all were OK
+            // • duracion    : total elapsed from first start to last end (true batch impact)
+            let real = null;
+            if (matches.length > 0) {
+                const byStart  = matches.slice().sort((a, b) => new Date(a.fechaInicio) - new Date(b.fechaInicio));
+                const byEnd    = matches.slice().sort((a, b) => new Date(b.fechaFin)    - new Date(a.fechaFin));
+                const first    = byStart[0];
+                const lastFin  = byEnd[0];
+                const hasError = matches.some(r => String(r.estado).toUpperCase() === 'ERROR');
+
+                if (matches.length === 1) {
+                    real = matches[0]; // single run: use as-is
+                } else {
+                    // Multiple runs (retries): span from first start to last end
+                    const totalMs  = new Date(lastFin.fechaFin) - new Date(first.fechaInicio);
+                    const totalMin = totalMs > 0 ? totalMs / 60000 : 0;
+                    real = {
+                        ...lastFin,
+                        fechaInicio: first.fechaInicio,
+                        estado:      hasError ? 'ERROR' : lastFin.estado,
+                        duracion:    minToHHMM(totalMin)   // total wall-clock duration
+                    };
+                }
+            }
 
             const duracionRefMin  = parseDuracion(ref.duracionRef);
             const duracionRealMin = real ? parseDuracion(real.duracion) : null;
@@ -1085,12 +1163,13 @@
                 onLine:          onLineDate,
                 deberiaFinalizar,
                 incremento,
-                encontrado: !!real
+                encontrado: !!real,
+                totalRuns: matches.length
             };
         });
 
         // Calculate Wait: inicio siguiente − fin actual (minutes)
-        return rows.map((row, i, arr) => {
+        const mainRows = rows.map((row, i, arr) => {
             const siguiente      = arr[i + 1];
             const finActual       = row.fechaFinReal            ? csvDate(row.fechaFinReal)            : null;
             const inicioSiguiente = siguiente?.fechaInicioReal ? csvDate(siguiente.fechaInicioReal) : null;
@@ -1102,6 +1181,57 @@
 
             return { ...row, wait: waitMin };
         });
+
+        // ── Extra: CSV ERROR rows not present in the comparativo ──────────
+        // These processes ran with errors but aren't tracked in the reference sheet.
+        const matchedProcesos = new Set(comparativo.map(r => String(r.proceso).trim()));
+        const unmatchedMap = {};
+        probatch.forEach(r => {
+            if (r.comandoCodigo && !matchedProcesos.has(r.comandoCodigo)) {
+                if (!unmatchedMap[r.comandoCodigo]) unmatchedMap[r.comandoCodigo] = [];
+                unmatchedMap[r.comandoCodigo].push(r);
+            }
+        });
+
+        const extraRows = Object.entries(unmatchedMap)
+            .filter(([, runs]) => runs.some(r => String(r.estado).toUpperCase() === 'ERROR'))
+            .map(([codigo, runs]) => {
+                const byStart  = runs.slice().sort((a, b) => new Date(a.fechaInicio) - new Date(b.fechaInicio));
+                const byEnd    = runs.slice().sort((a, b) => new Date(b.fechaFin)    - new Date(a.fechaFin));
+                const hasError = runs.some(r => String(r.estado).toUpperCase() === 'ERROR');
+                const totalMs  = new Date(byEnd[0].fechaFin) - new Date(byStart[0].fechaInicio);
+                const totalMin = totalMs > 0 ? totalMs / 60000 : 0;
+                return {
+                    instancia: null, lote: null,
+                    proceso:   codigo,
+                    sqr:       '—',
+                    duracionRef: null, fechaInicioRef: null, fechaFinRef: null, faltaBatch: null,
+                    fechaInicioReal: byStart[0].fechaInicio,
+                    fechaFinReal:    byEnd[0].fechaFin,
+                    duracionReal:    runs.length > 1 ? minToHHMM(totalMin) : runs[0].duracion,
+                    estado:          hasError ? 'ERROR' : byEnd[0].estado,
+                    onLine: null, deberiaFinalizar: null, incremento: null,
+                    encontrado: true, wait: null,
+                    totalRuns: runs.length,
+                    sinReferencia: true   // flag: not in comparativo
+                };
+            })
+            .sort((a, b) => new Date(a.fechaInicioReal) - new Date(b.fechaInicioReal));
+
+        return [...mainRows, ...extraRows];
+    }
+
+    // ─────────────────────────────────────────────
+    //  Helpers
+    // ─────────────────────────────────────────────
+    function fmtDelta(min) {
+        if (min === null || min === undefined) return null;
+        const r = Math.round(min);
+        if (r === 0) return '±0';
+        const sign = r < 0 ? '-' : '+';
+        const abs = Math.abs(r);
+        const h = Math.floor(abs / 60), m = abs % 60;
+        return h > 0 ? `${sign}${h}h${m > 0 ? ` ${m}m` : ''}` : `${sign}${m}min`;
     }
 
     // ─────────────────────────────────────────────
@@ -1120,12 +1250,7 @@
                     </div>
                     <div>
                         <div class="results-panel-title">Camino Crítico</div>
-                        <div class="rp-stats">
-                            <span class="rp-stat total">${rows.length} procesos</span>
-                            <span class="rp-stat exec">${rows.filter(r => r.encontrado).length} ejecutados</span>
-                            ${rows.filter(r => r.incremento > 5 && r.encontrado).length > 0 ? `<span class="rp-stat delayed">${rows.filter(r => r.incremento > 5 && r.encontrado).length} demorado${rows.filter(r => r.incremento > 5 && r.encontrado).length > 1 ? 's' : ''}</span>` : ''}
-                            ${rows.filter(r => r.incremento < -5 && r.encontrado).length > 0 ? `<span class="rp-stat fast">${rows.filter(r => r.incremento < -5 && r.encontrado).length} más rápido${rows.filter(r => r.incremento < -5 && r.encontrado).length > 1 ? 's' : ''}</span>` : ''}
-                        </div>
+                        <div class="rp-stats" id="rp-stats-bar"></div>
                     </div>
                 </div>
                 <div class="results-panel-header-right">
@@ -1150,6 +1275,20 @@
             </div>
             <div class="table-scroll">
                 <table class="cc-table">
+                    <colgroup>
+                        <col style="width:28px">
+                        <col style="width:50px">
+                        <col style="width:60px">
+                        <col style="width:auto">
+                        <col style="width:200px">
+                        <col style="width:110px">
+                        <col style="width:90px">
+                        <col style="width:110px">
+                        <col style="width:80px">
+                        <col style="width:80px">
+                        <col style="width:100px">
+                        <col style="width:80px">
+                    </colgroup>
                     <thead>
                         <tr>
                             <th></th>
@@ -1162,32 +1301,61 @@
                             <th>Fin Real</th>
                             <th>Dur. Ref.</th>
                             <th>Dur. Real</th>
-                            <th>Incremento</th>
+                            <th>Δ Duración</th>
                             <th>Estado</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${rows.map((row, i) => buildRow(row, i)).join('')}
+                        ${rows.map((row, i) => buildRow(row, i, rows)).join('')}
                     </tbody>
                 </table>
             </div>
         </div>`;
 
         container.innerHTML = html;
+
+        // Build stats bar
+        const mainRows  = rows.filter(r => !r.sinReferencia);
+        const execCount = mainRows.filter(r => r.encontrado).length;
+        const errCount  = rows.filter(r => String(r.estado).toUpperCase() === 'ERROR').length;
+        const noDataCount = mainRows.filter(r => !r.encontrado).length;
+        const delayedCount = mainRows.filter(r => r.incremento > 5 && r.encontrado).length;
+        const fastCount    = mainRows.filter(r => r.incremento < -5 && r.encontrado).length;
+        const fueraCount   = rows.filter(r => r.sinReferencia).length;
+        const statsEl = document.getElementById('rp-stats-bar');
+        const sb = [];
+        sb.push(`<span class="rp-stat total">${rows.length} procesos</span>`);
+        sb.push(`<span class="rp-stat exec">${execCount} ejecutados</span>`);
+        if (errCount)  sb.push(`<span class="rp-stat err">${errCount} error${errCount > 1 ? 'es' : ''}</span>`);
+        if (noDataCount) sb.push(`<span class="rp-stat nodata">${noDataCount} sin datos</span>`);
+        if (delayedCount) sb.push(`<span class="rp-stat delayed">${delayedCount} demorado${delayedCount > 1 ? 's' : ''}</span>`);
+        if (fastCount) sb.push(`<span class="rp-stat fast">${fastCount} más rápido${fastCount > 1 ? 's' : ''}</span>`);
+        if (fueraCount) sb.push(`<span class="rp-stat fuera">${fueraCount} fuera ref.</span>`);
+        statsEl.innerHTML = sb.join('');
+
         document.getElementById('btnVerGantt').addEventListener('click', abrirGantt);
         document.getElementById('btnVerTimeline').addEventListener('click', abrirTimeline);
         document.getElementById('btnCopiarMail').addEventListener('click', copiarInforme);
     }
 
-    function buildRow(row, idx) {
+    function buildRow(row, idx, allRows) {
         const isError   = String(row.estado).toUpperCase() === 'ERROR';
         const isMissing = !row.encontrado;
+        const isFirst   = idx === 0;
+        const prevRow   = allRows ? allRows[idx - 1] : null;
+        const isFirstFueraRef = row.sinReferencia && (isFirst || !prevRow?.sinReferencia);
 
         let rowStateClass = '';
-        if (isError)        rowStateClass = 'row-error';
-        else if (isMissing) rowStateClass = 'row-missing';
+        if (row.sinReferencia) rowStateClass = 'row-sin-referencia';
+        else if (isError)      rowStateClass = 'row-error';
+        else if (isMissing)    rowStateClass = 'row-missing';
 
-        // Estado cell — pill badge
+        // Section separator before first fuera-ref row
+        const separator = isFirstFueraRef
+            ? `<tr class="cc-section-sep"><td colspan="12">⚠ Procesos con ERROR no presentes en el comparativo de referencia</td></tr>`
+            : '';
+
+        // Estado badge
         let estadoCell;
         const estadoStr = escHtml(row.estado);
         if (isError) {
@@ -1198,23 +1366,33 @@
             estadoCell = `<td><span class="badge-estado badge-estado-none">—</span></td>`;
         }
 
-        // Proceso cell — badge if no data
-        const procesoCell = isMissing
-            ? `<td>${escHtml(row.proceso)} <span class="badge-missing">Sin datos</span></td>`
-            : `<td>${escHtml(row.proceso)}</td>`;
+        // Retries badge (show only when > 1 run)
+        const retriesBadge = (row.totalRuns > 1)
+            ? `<span class="badge-retries" title="${row.totalRuns} corridas">${row.totalRuns}x</span>`
+            : '';
 
-        // Incremento cell — badge with background
-        let incrementoCell = '<td><span style="color:#CBD5E1;">—</span></td>';
+        // Proceso cell
+        const procesoCell = row.sinReferencia
+            ? `<td>${escHtml(row.proceso)}${retriesBadge} <span class="badge-sin-ref" title="No está en el comparativo de referencia">fuera ref.</span></td>`
+            : isMissing
+            ? `<td>${escHtml(row.proceso)} <span class="badge-missing">Sin datos</span></td>`
+            : `<td>${escHtml(row.proceso)}${retriesBadge}</td>`;
+
+        // SQR cell — truncate with tooltip
+        const sqrStr = String(row.sqr ?? '—');
+        const sqrTrunc = sqrStr.length > 30 ? sqrStr.slice(0, 28) + '…' : sqrStr;
+        const sqrCell = `<td class="td-dim" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${escHtml(sqrStr)}">${escHtml(sqrTrunc)}</td>`;
+
+        // Δ Duración cell using fmtDelta
+        let incCell = `<td class="td-dim td-r">—</td>`;
         if (row.incremento !== null) {
-            const val = minToHHMM(row.incremento);
-            if (row.incremento > 0)      incrementoCell = `<td><span class="cell-increment-pos">▲ +${val}</span></td>`;
-            else if (row.incremento < 0) incrementoCell = `<td><span class="cell-increment-neg">▼ ${val}</span></td>`;
-            else                          incrementoCell = `<td><span style="color:#94A3B8;font-size:11px;">${val}</span></td>`;
+            const label = fmtDelta(row.incremento);
+            if (row.incremento > 0)      incCell = `<td class="td-r"><span class="inc-badge inc-pos">▲ ${label}</span></td>`;
+            else if (row.incremento < 0) incCell = `<td class="td-r"><span class="inc-badge inc-neg">▼ ${label}</span></td>`;
+            else                          incCell = `<td class="td-r"><span class="inc-badge inc-zero">${label}</span></td>`;
         }
 
-        const durRefDisplay = row.duracionRef
-            ? escHtml(String(row.duracionRef))
-            : '—';
+        const durRefDisplay = row.duracionRef ? escHtml(String(row.duracionRef)) : '—';
 
         // On Line cell
         const onLineCell = row.onLine
@@ -1226,40 +1404,38 @@
             <td class="cc-expand-cell">
                 <svg class="cc-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </td>
-            <td>${escHtml(String(row.instancia ?? '—'))}</td>
-            <td>${escHtml(String(row.lote ?? '—'))}</td>
+            <td class="td-dim">${escHtml(String(row.instancia ?? '—'))}</td>
+            <td class="td-dim">${escHtml(String(row.lote ?? '—'))}</td>
             ${procesoCell}
-            <td>${escHtml(String(row.sqr ?? '—'))}</td>
-            <td>${formatDateTime(row.fechaInicioReal)}</td>
+            ${sqrCell}
+            <td class="td-mono">${formatDateTime(row.fechaInicioReal)}</td>
             ${onLineCell}
-            <td>${formatDateTime(row.fechaFinReal)}</td>
-            <td>${durRefDisplay}</td>
-            <td>${escHtml(String(row.duracionReal ?? '—'))}</td>
-            ${incrementoCell}
+            <td class="td-mono">${formatDateTime(row.fechaFinReal)}</td>
+            <td class="td-mono td-dim">${durRefDisplay}</td>
+            <td class="td-mono">${escHtml(String(row.duracionReal ?? '—'))}</td>
+            ${incCell}
             ${estadoCell}
         </tr>`;
+
+        // Detail panel: richer info
+        const detailItems = [];
+        if (row.faltaBatch != null) detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Falta Batch</span><span class="cc-detail-value td-mono">${minToHHMM(row.faltaBatch)}</span></div>`);
+        if (row.fechaInicioRef)     detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Inicio Ref.</span><span class="cc-detail-value td-mono">${formatDateTime(row.fechaInicioRef)}</span></div>`);
+        if (row.fechaFinRef)        detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Fin Ref.</span><span class="cc-detail-value td-mono">${formatDateTime(row.fechaFinRef)}</span></div>`);
+        if (row.deberiaFinalizar)   detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Debería Fin.</span><span class="cc-detail-value td-mono">${formatDateTime(row.deberiaFinalizar)}</span></div>`);
+        if (row.wait != null)       detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Wait</span><span class="cc-detail-value td-mono">${minToHHMM(row.wait)}</span></div>`);
+        if (row.totalRuns > 1)      detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Corridas</span><span class="cc-detail-value">${row.totalRuns} intentos</span></div>`);
 
         const detailRow = `
         <tr class="cc-detail-row" id="detail-${idx}">
             <td colspan="12">
                 <div class="cc-detail-grid">
-                    <div class="cc-detail-item">
-                        <span class="cc-detail-label">Falta Batch</span>
-                        <span class="cc-detail-value">${minToHHMM(row.faltaBatch)}</span>
-                    </div>
-                    <div class="cc-detail-item">
-                        <span class="cc-detail-label">Debería Fin.</span>
-                        <span class="cc-detail-value">${formatDateTime(row.deberiaFinalizar)}</span>
-                    </div>
-                    <div class="cc-detail-item">
-                        <span class="cc-detail-label">Wait</span>
-                        <span class="cc-detail-value">${minToHHMM(row.wait)}</span>
-                    </div>
+                    ${detailItems.join('')}
                 </div>
             </td>
         </tr>`;
 
-        return mainRow + detailRow;
+        return separator + mainRow + detailRow;
     }
 
     function toggleDetail(idx) {
@@ -1363,10 +1539,23 @@
         const rawHitos = HITOS_CRITICOS.map(id => {
             const fila      = filas.find(f => String(f.proceso).trim() === id);
             const completado = !!(fila?.fechaInicioReal && fila?.fechaFinReal);
-            const refDate    = completado ? computeHoraRefDate(fila) : null;
-            const finishDelta = completado && fila?.fechaFinReal && refDate
-                ? Math.round((csvDate(fila.fechaFinReal) - refDate) / 60000)
-                : null;
+            // Compute finish-time delta from displayed HH:MM strings to avoid
+            // timezone mismatches between XLSX (UTC) and CSV (local) dates.
+            const _horaReal = fila?.fechaFinReal ? formatHora(fila.fechaFinReal) : null;
+            const _horaRef  = computeHoraRef(fila);
+            const _toMin = s => {
+                if (!s || s === '—') return null;
+                const [h, m] = s.split(':').map(Number);
+                return (isNaN(h) || isNaN(m)) ? null : h * 60 + m;
+            };
+            const _rm = _toMin(_horaReal), _refm = _toMin(_horaRef);
+            let finishDelta = null;
+            if (completado && _rm !== null && _refm !== null) {
+                let diff = _rm - _refm;
+                if (diff < -720) diff += 1440; // crossed midnight forward
+                if (diff >  720) diff -= 1440; // crossed midnight backward
+                finishDelta = Math.round(diff);
+            }
 
             return {
                 id,
@@ -1457,28 +1646,28 @@
                             :                'PENDIENTE';
             const badgeHTML = `<span style="font-family:${mono};font-size:8px;font-weight:700;letter-spacing:.12em;padding:3px 9px;border-radius:4px;background:${pal.badge};color:${pal.bText};">${badgeText}</span>`;
 
-            // ── Finish-time Delta (REAL finish vs REF finish) ────────
-            let finishDeltaHTML = '';
-            if (h.finishDelta !== null) {
-                const fd = h.finishDelta;
-                const fdC = fd <= 0 ? '#0D9488' : '#B45309';
-                const fdB = fd <= 0 ? '#CCFBF1'  : '#FFF7ED';
-                const fdS = fd <= 0 ? '▼' : '▲';
-                finishDeltaHTML = `<span style="font-family:${mono};font-size:8px;font-weight:600;padding:2px 7px;border-radius:3px;background:${fdB};color:${fdC};white-space:nowrap;letter-spacing:.06em;">fin ${fdS} ${minToHuman(fd)}</span>`;
-            }
-
-            // ── Delta ────────────────────────────────────────────────
+            // ── Duration delta (task ran X min faster/slower than ref duration) ──
             let deltaHTML = '';
             if (h.incremento !== null) {
                 const inc = h.incremento;
                 const dC  = inc <= 0 ? '#059669' : '#DC2626';
                 const dB  = inc <= 0 ? '#DCFCE7'  : '#FEE2E2';
                 const dS  = inc <= 0 ? '▼' : '▲';
-                deltaHTML = `<span style="font-family:${mono};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:4px;background:${dB};color:${dC};white-space:nowrap;">${dS} ${minToHuman(inc)}</span>`;
+                deltaHTML = `<span style="font-family:${mono};font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:${dB};color:${dC};white-space:nowrap;">${dS} ${minToHuman(inc)}</span>`;
             } else if (esProximo) {
-                deltaHTML = `<span style="font-family:${mono};font-size:9px;padding:2px 8px;border-radius:4px;background:#FEF3C7;color:#B45309;">en curso</span>`;
+                deltaHTML = `<span style="font-family:${mono};font-size:8.5px;padding:2px 7px;border-radius:4px;background:#FEF3C7;color:#B45309;">en curso</span>`;
             } else if (esPendiente) {
-                deltaHTML = `<span style="font-family:${mono};font-size:9px;padding:2px 8px;border-radius:4px;background:#F1F5F9;color:#94A3B8;">pendiente</span>`;
+                deltaHTML = `<span style="font-family:${mono};font-size:8.5px;padding:2px 7px;border-radius:4px;background:#F1F5F9;color:#94A3B8;">pendiente</span>`;
+            }
+
+            // ── Finish-time delta (REAL finish vs REF finish hour) ───
+            let finishDeltaHTML = '';
+            if (h.finishDelta !== null) {
+                const fd = h.finishDelta;
+                const fdC = fd <= 0 ? '#0D9488' : '#B45309';
+                const fdB = fd <= 0 ? '#CCFBF1'  : '#FFF7ED';
+                const fdS = fd <= 0 ? '▼' : '▲';
+                finishDeltaHTML = `<span style="font-family:${mono};font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;background:${fdB};color:${fdC};white-space:nowrap;">fin ${fdS} ${minToHuman(fd)}</span>`;
             }
 
             // ── Dot ──────────────────────────────────────────────────
@@ -1514,26 +1703,28 @@
                         <div style="width:2px;flex:1;background:${lineBelow};"></div>
                     </div>
                     <div style="flex:1;padding-left:12px;padding-bottom:12px;">
-                        <div style="${pal.cardBorder}border-radius:8px;padding:10px 13px;background:${pal.cardBg};${esPendiente ? 'opacity:.55;' : ''}">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <div style="${pal.cardBorder}border-radius:8px;padding:9px 12px;background:${pal.cardBg};${esPendiente ? 'opacity:.55;' : ''}">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
                                 <div>
-                                    <span style="font-family:${mono};font-size:12px;font-weight:700;color:${pal.time};">${h.id}</span>${sqrLabel}
+                                    <span style="font-family:${mono};font-size:11px;font-weight:700;color:${pal.time};">${h.id}</span>${sqrLabel}
                                 </div>
                                 ${badgeHTML}
                             </div>
-                            <div style="display:flex;align-items:baseline;gap:10px;">
+                            <div style="display:flex;align-items:center;gap:8px;">
                                 <div>
-                                    <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:2px;">${horaLabel}</div>
-                                    <div style="font-family:${mono};font-size:18px;font-weight:500;color:${pal.time};line-height:1;letter-spacing:-.5px;">${horaDisplay}</div>
+                                    <div style="font-family:${mono};font-size:8.5px;font-weight:700;letter-spacing:.1em;color:#94A3B8;margin-bottom:2px;">${horaLabel}</div>
+                                    <div style="font-family:${mono};font-size:15px;font-weight:600;color:${pal.time};line-height:1;letter-spacing:-.3px;">${horaDisplay}</div>
                                 </div>
-                                <div style="color:#CBD5E1;font-size:15px;padding-bottom:1px;align-self:flex-end;">→</div>
+                                <div style="color:#CBD5E1;font-size:13px;margin-top:10px;">→</div>
                                 <div>
-                                    <div style="font-family:${mono};font-size:7.5px;font-weight:700;letter-spacing:.12em;color:#94A3B8;margin-bottom:2px;">REF.</div>
-                                    <div style="font-family:${mono};font-size:18px;font-weight:400;color:#CBD5E1;line-height:1;letter-spacing:-.5px;">${refDisplay}</div>
+                                    <div style="font-family:${mono};font-size:8.5px;font-weight:700;letter-spacing:.1em;color:#94A3B8;margin-bottom:2px;">REF.</div>
+                                    <div style="font-family:${mono};font-size:15px;font-weight:400;color:#94A3B8;line-height:1;letter-spacing:-.3px;">${refDisplay}</div>
                                 </div>
-                                <div style="margin-left:auto;align-self:flex-end;padding-bottom:2px;">${deltaHTML}</div>
+                                <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+                                    ${deltaHTML}
+                                    ${finishDeltaHTML}
+                                </div>
                             </div>
-                            ${finishDeltaHTML ? `<div style="margin-top:5px;">${finishDeltaHTML}</div>` : ''}
                         </div>
                     </div>
                 </div>`);
