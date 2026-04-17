@@ -300,6 +300,9 @@
         .rp-stat.exec    { background: #EFF6FF; color: #1D4ED8; }
         .rp-stat.delayed { background: #FEF2F2; color: #DC2626; }
         .rp-stat.fast    { background: #F0FDF4; color: #15803D; }
+        .rp-stat.err     { background: #FEE2E2; color: #B91C1C; }
+        .rp-stat.nodata  { background: #F1F5F9; color: #64748B; }
+        .rp-stat.fuera   { background: #FEF3C7; color: #92400E; }
 
         /* ── Table wrapper ── */
         .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -401,6 +404,39 @@
             font-weight: 700;
             font-variant-numeric: tabular-nums;
         }
+
+        /* Inc-badge variants (Δ Duración) */
+        .inc-badge {
+            display: inline-flex; align-items: center; gap: 2px;
+            padding: 2px 7px; border-radius: 6px;
+            font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+        }
+        .inc-pos  { background: #FEF2F2; color: #DC2626; }
+        .inc-neg  { background: #F0FDF4; color: #15803D; }
+        .inc-zero { background: #F1F5F9; color: #64748B; }
+
+        /* Retries badge */
+        .badge-retries {
+            display: inline-flex; align-items: center;
+            padding: 1px 6px; border-radius: 20px;
+            background: #FEE2E2; color: #B91C1C;
+            font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em;
+            margin-left: 4px; vertical-align: middle;
+        }
+
+        /* Section separator row */
+        .cc-section-sep td {
+            padding: 5px 12px;
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.08em; color: #92400E;
+            background: #FFFBEB; border-top: 1px dashed #FCD34D;
+            border-bottom: 1px dashed #FCD34D;
+        }
+
+        /* Table cell utilities */
+        .td-mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; }
+        .td-r    { text-align: right; }
+        .td-dim  { color: #94A3B8; }
 
         /* Estado badges */
         .badge-estado {
@@ -1127,7 +1163,8 @@
                 onLine:          onLineDate,
                 deberiaFinalizar,
                 incremento,
-                encontrado: !!real
+                encontrado: !!real,
+                totalRuns: matches.length
             };
         });
 
@@ -1175,12 +1212,26 @@
                     estado:          hasError ? 'ERROR' : byEnd[0].estado,
                     onLine: null, deberiaFinalizar: null, incremento: null,
                     encontrado: true, wait: null,
+                    totalRuns: runs.length,
                     sinReferencia: true   // flag: not in comparativo
                 };
             })
             .sort((a, b) => new Date(a.fechaInicioReal) - new Date(b.fechaInicioReal));
 
         return [...mainRows, ...extraRows];
+    }
+
+    // ─────────────────────────────────────────────
+    //  Helpers
+    // ─────────────────────────────────────────────
+    function fmtDelta(min) {
+        if (min === null || min === undefined) return null;
+        const r = Math.round(min);
+        if (r === 0) return '±0';
+        const sign = r < 0 ? '-' : '+';
+        const abs = Math.abs(r);
+        const h = Math.floor(abs / 60), m = abs % 60;
+        return h > 0 ? `${sign}${h}h${m > 0 ? ` ${m}m` : ''}` : `${sign}${m}min`;
     }
 
     // ─────────────────────────────────────────────
@@ -1199,12 +1250,7 @@
                     </div>
                     <div>
                         <div class="results-panel-title">Camino Crítico</div>
-                        <div class="rp-stats">
-                            <span class="rp-stat total">${rows.length} procesos</span>
-                            <span class="rp-stat exec">${rows.filter(r => r.encontrado).length} ejecutados</span>
-                            ${rows.filter(r => r.incremento > 5 && r.encontrado).length > 0 ? `<span class="rp-stat delayed">${rows.filter(r => r.incremento > 5 && r.encontrado).length} demorado${rows.filter(r => r.incremento > 5 && r.encontrado).length > 1 ? 's' : ''}</span>` : ''}
-                            ${rows.filter(r => r.incremento < -5 && r.encontrado).length > 0 ? `<span class="rp-stat fast">${rows.filter(r => r.incremento < -5 && r.encontrado).length} más rápido${rows.filter(r => r.incremento < -5 && r.encontrado).length > 1 ? 's' : ''}</span>` : ''}
-                        </div>
+                        <div class="rp-stats" id="rp-stats-bar"></div>
                     </div>
                 </div>
                 <div class="results-panel-header-right">
@@ -1229,6 +1275,20 @@
             </div>
             <div class="table-scroll">
                 <table class="cc-table">
+                    <colgroup>
+                        <col style="width:28px">
+                        <col style="width:50px">
+                        <col style="width:60px">
+                        <col style="width:auto">
+                        <col style="width:200px">
+                        <col style="width:110px">
+                        <col style="width:90px">
+                        <col style="width:110px">
+                        <col style="width:80px">
+                        <col style="width:80px">
+                        <col style="width:100px">
+                        <col style="width:80px">
+                    </colgroup>
                     <thead>
                         <tr>
                             <th></th>
@@ -1241,33 +1301,61 @@
                             <th>Fin Real</th>
                             <th>Dur. Ref.</th>
                             <th>Dur. Real</th>
-                            <th>Incremento</th>
+                            <th>Δ Duración</th>
                             <th>Estado</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${rows.map((row, i) => buildRow(row, i)).join('')}
+                        ${rows.map((row, i) => buildRow(row, i, rows)).join('')}
                     </tbody>
                 </table>
             </div>
         </div>`;
 
         container.innerHTML = html;
+
+        // Build stats bar
+        const mainRows  = rows.filter(r => !r.sinReferencia);
+        const execCount = mainRows.filter(r => r.encontrado).length;
+        const errCount  = rows.filter(r => String(r.estado).toUpperCase() === 'ERROR').length;
+        const noDataCount = mainRows.filter(r => !r.encontrado).length;
+        const delayedCount = mainRows.filter(r => r.incremento > 5 && r.encontrado).length;
+        const fastCount    = mainRows.filter(r => r.incremento < -5 && r.encontrado).length;
+        const fueraCount   = rows.filter(r => r.sinReferencia).length;
+        const statsEl = document.getElementById('rp-stats-bar');
+        const sb = [];
+        sb.push(`<span class="rp-stat total">${rows.length} procesos</span>`);
+        sb.push(`<span class="rp-stat exec">${execCount} ejecutados</span>`);
+        if (errCount)  sb.push(`<span class="rp-stat err">${errCount} error${errCount > 1 ? 'es' : ''}</span>`);
+        if (noDataCount) sb.push(`<span class="rp-stat nodata">${noDataCount} sin datos</span>`);
+        if (delayedCount) sb.push(`<span class="rp-stat delayed">${delayedCount} demorado${delayedCount > 1 ? 's' : ''}</span>`);
+        if (fastCount) sb.push(`<span class="rp-stat fast">${fastCount} más rápido${fastCount > 1 ? 's' : ''}</span>`);
+        if (fueraCount) sb.push(`<span class="rp-stat fuera">${fueraCount} fuera ref.</span>`);
+        statsEl.innerHTML = sb.join('');
+
         document.getElementById('btnVerGantt').addEventListener('click', abrirGantt);
         document.getElementById('btnVerTimeline').addEventListener('click', abrirTimeline);
         document.getElementById('btnCopiarMail').addEventListener('click', copiarInforme);
     }
 
-    function buildRow(row, idx) {
+    function buildRow(row, idx, allRows) {
         const isError   = String(row.estado).toUpperCase() === 'ERROR';
         const isMissing = !row.encontrado;
+        const isFirst   = idx === 0;
+        const prevRow   = allRows ? allRows[idx - 1] : null;
+        const isFirstFueraRef = row.sinReferencia && (isFirst || !prevRow?.sinReferencia);
 
         let rowStateClass = '';
         if (row.sinReferencia) rowStateClass = 'row-sin-referencia';
         else if (isError)      rowStateClass = 'row-error';
         else if (isMissing)    rowStateClass = 'row-missing';
 
-        // Estado cell — pill badge
+        // Section separator before first fuera-ref row
+        const separator = isFirstFueraRef
+            ? `<tr class="cc-section-sep"><td colspan="12">⚠ Procesos con ERROR no presentes en el comparativo de referencia</td></tr>`
+            : '';
+
+        // Estado badge
         let estadoCell;
         const estadoStr = escHtml(row.estado);
         if (isError) {
@@ -1278,25 +1366,33 @@
             estadoCell = `<td><span class="badge-estado badge-estado-none">—</span></td>`;
         }
 
-        // Proceso cell — badge if no data or not in reference
+        // Retries badge (show only when > 1 run)
+        const retriesBadge = (row.totalRuns > 1)
+            ? `<span class="badge-retries" title="${row.totalRuns} corridas">${row.totalRuns}x</span>`
+            : '';
+
+        // Proceso cell
         const procesoCell = row.sinReferencia
-            ? `<td>${escHtml(row.proceso)} <span class="badge-sin-ref" title="Este proceso no está en el comparativo de referencia">fuera ref.</span></td>`
+            ? `<td>${escHtml(row.proceso)}${retriesBadge} <span class="badge-sin-ref" title="No está en el comparativo de referencia">fuera ref.</span></td>`
             : isMissing
             ? `<td>${escHtml(row.proceso)} <span class="badge-missing">Sin datos</span></td>`
-            : `<td>${escHtml(row.proceso)}</td>`;
+            : `<td>${escHtml(row.proceso)}${retriesBadge}</td>`;
 
-        // Incremento cell — badge with background
-        let incrementoCell = '<td><span style="color:#CBD5E1;">—</span></td>';
+        // SQR cell — truncate with tooltip
+        const sqrStr = String(row.sqr ?? '—');
+        const sqrTrunc = sqrStr.length > 30 ? sqrStr.slice(0, 28) + '…' : sqrStr;
+        const sqrCell = `<td class="td-dim" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${escHtml(sqrStr)}">${escHtml(sqrTrunc)}</td>`;
+
+        // Δ Duración cell using fmtDelta
+        let incCell = `<td class="td-dim td-r">—</td>`;
         if (row.incremento !== null) {
-            const val = minToHHMM(row.incremento);
-            if (row.incremento > 0)      incrementoCell = `<td><span class="cell-increment-pos">▲ +${val}</span></td>`;
-            else if (row.incremento < 0) incrementoCell = `<td><span class="cell-increment-neg">▼ ${val}</span></td>`;
-            else                          incrementoCell = `<td><span style="color:#94A3B8;font-size:11px;">${val}</span></td>`;
+            const label = fmtDelta(row.incremento);
+            if (row.incremento > 0)      incCell = `<td class="td-r"><span class="inc-badge inc-pos">▲ ${label}</span></td>`;
+            else if (row.incremento < 0) incCell = `<td class="td-r"><span class="inc-badge inc-neg">▼ ${label}</span></td>`;
+            else                          incCell = `<td class="td-r"><span class="inc-badge inc-zero">${label}</span></td>`;
         }
 
-        const durRefDisplay = row.duracionRef
-            ? escHtml(String(row.duracionRef))
-            : '—';
+        const durRefDisplay = row.duracionRef ? escHtml(String(row.duracionRef)) : '—';
 
         // On Line cell
         const onLineCell = row.onLine
@@ -1308,40 +1404,38 @@
             <td class="cc-expand-cell">
                 <svg class="cc-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </td>
-            <td>${escHtml(String(row.instancia ?? '—'))}</td>
-            <td>${escHtml(String(row.lote ?? '—'))}</td>
+            <td class="td-dim">${escHtml(String(row.instancia ?? '—'))}</td>
+            <td class="td-dim">${escHtml(String(row.lote ?? '—'))}</td>
             ${procesoCell}
-            <td>${escHtml(String(row.sqr ?? '—'))}</td>
-            <td>${formatDateTime(row.fechaInicioReal)}</td>
+            ${sqrCell}
+            <td class="td-mono">${formatDateTime(row.fechaInicioReal)}</td>
             ${onLineCell}
-            <td>${formatDateTime(row.fechaFinReal)}</td>
-            <td>${durRefDisplay}</td>
-            <td>${escHtml(String(row.duracionReal ?? '—'))}</td>
-            ${incrementoCell}
+            <td class="td-mono">${formatDateTime(row.fechaFinReal)}</td>
+            <td class="td-mono td-dim">${durRefDisplay}</td>
+            <td class="td-mono">${escHtml(String(row.duracionReal ?? '—'))}</td>
+            ${incCell}
             ${estadoCell}
         </tr>`;
+
+        // Detail panel: richer info
+        const detailItems = [];
+        if (row.faltaBatch != null) detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Falta Batch</span><span class="cc-detail-value td-mono">${minToHHMM(row.faltaBatch)}</span></div>`);
+        if (row.fechaInicioRef)     detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Inicio Ref.</span><span class="cc-detail-value td-mono">${formatDateTime(row.fechaInicioRef)}</span></div>`);
+        if (row.fechaFinRef)        detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Fin Ref.</span><span class="cc-detail-value td-mono">${formatDateTime(row.fechaFinRef)}</span></div>`);
+        if (row.deberiaFinalizar)   detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Debería Fin.</span><span class="cc-detail-value td-mono">${formatDateTime(row.deberiaFinalizar)}</span></div>`);
+        if (row.wait != null)       detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Wait</span><span class="cc-detail-value td-mono">${minToHHMM(row.wait)}</span></div>`);
+        if (row.totalRuns > 1)      detailItems.push(`<div class="cc-detail-item"><span class="cc-detail-label">Corridas</span><span class="cc-detail-value">${row.totalRuns} intentos</span></div>`);
 
         const detailRow = `
         <tr class="cc-detail-row" id="detail-${idx}">
             <td colspan="12">
                 <div class="cc-detail-grid">
-                    <div class="cc-detail-item">
-                        <span class="cc-detail-label">Falta Batch</span>
-                        <span class="cc-detail-value">${minToHHMM(row.faltaBatch)}</span>
-                    </div>
-                    <div class="cc-detail-item">
-                        <span class="cc-detail-label">Debería Fin.</span>
-                        <span class="cc-detail-value">${formatDateTime(row.deberiaFinalizar)}</span>
-                    </div>
-                    <div class="cc-detail-item">
-                        <span class="cc-detail-label">Wait</span>
-                        <span class="cc-detail-value">${minToHHMM(row.wait)}</span>
-                    </div>
+                    ${detailItems.join('')}
                 </div>
             </td>
         </tr>`;
 
-        return mainRow + detailRow;
+        return separator + mainRow + detailRow;
     }
 
     function toggleDetail(idx) {
