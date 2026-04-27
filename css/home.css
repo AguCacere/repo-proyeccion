@@ -939,3 +939,114 @@ body { background-color: #f8f9fa; }
     color: #111827;
     border-color: #9CA3AF;
 }
+
+/* AI Insight — body estructurado */
+.ai-summary {
+  background: #f8f8f8;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.ai-summary-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin-bottom: 6px;
+}
+.ai-summary-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #111;
+}
+.ai-metrics-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.ai-metric-card {
+  flex: 1;
+  background: #f8f8f8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: center;
+}
+.ai-metric-value {
+  font-size: 22px;
+  font-weight: 500;
+  color: #111;
+}
+.ai-metric-value.ai-metric-danger { color: #A32D2D; }
+.ai-metric-value.ai-metric-warning { color: #854F0B; }
+.ai-metric-value.ai-metric-ok { color: #3B6D11; }
+.ai-metric-label {
+  font-size: 11px;
+  color: #888;
+  margin-top: 2px;
+}
+.ai-divider {
+  border: none;
+  border-top: 1px solid #ebebeb;
+  margin: 0 0 16px 0;
+}
+.ai-section { margin-bottom: 16px; }
+.ai-section:last-child { margin-bottom: 0; }
+.ai-section-title {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin-bottom: 8px;
+}
+.ai-process-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ai-process-table th {
+  font-size: 11px;
+  font-weight: 500;
+  color: #888;
+  text-align: left;
+  padding: 4px 0;
+  border-bottom: 1px solid #ebebeb;
+}
+.ai-process-table th:last-child { text-align: right; }
+.ai-process-table td {
+  padding: 7px 0;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+  color: #111;
+}
+.ai-process-table td:last-child { text-align: right; }
+.ai-process-table tr:last-child td { border-bottom: none; }
+.ai-process-name { font-weight: 500; font-size: 12px; }
+.ai-process-detail { font-size: 11px; color: #888; }
+.ai-delay-badge {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  display: inline-block;
+}
+.ai-delay-high { background: #FCEBEB; color: #791F1F; }
+.ai-delay-med { background: #FAEEDA; color: #633806; }
+.ai-obs-list { display: flex; flex-direction: column; gap: 6px; }
+.ai-obs-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: #111;
+  line-height: 1.5;
+}
+.ai-obs-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #7F77DD;
+  flex-shrink: 0;
+  margin-top: 7px;
+}

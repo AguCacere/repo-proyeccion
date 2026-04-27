@@ -28,8 +28,8 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
-        system: 'Sos un analista de operaciones bancarias. Recibís KPIs y detalle de demoras del mes. Generá exactamente 3 oraciones: 1) el impacto principal del mes en números, 2) el proceso más problemático y su causa, 3) una recomendación concreta. Sin títulos, sin markdown, sin listas, sin numeración. Solo 3 oraciones en prosa, máximo 80 palabras en total. Español, tono directo.',
+        max_tokens: 700,
+        system: 'Sos un analista de operaciones bancarias. Recibís KPIs y detalle de demoras del mes. Respondé SOLO con un objeto JSON válido, sin markdown, sin backticks, sin texto adicional antes ni después. El JSON debe tener exactamente esta estructura: {"resumen":"string de 2 oraciones máximo resumiendo el mes","metricas":[{"label":"string","valor":"string","tipo":"danger|warning|ok"}],"criticos":[{"nombre":"string","detalle":"string","demora":"string","severidad":"high|med"}],"observaciones":["string"]}. Reglas: metricas debe tener exactamente 3 items (ej: tasa de incidencia, procesos críticos, % del tiempo acumulado). criticos entre 2 y 4 items con los procesos de mayor demora. observaciones entre 2 y 4 strings; cada uno puede ser un patrón detectado o una recomendación concreta si aplica; no forzar recomendaciones si no hay claras. Español, tono directo.',
         messages: [{ role: 'user', content: `KPIs del período:\n${kpis}\n\nDetalle de demoras:\n${demoras}` }]
       })
     });
@@ -48,5 +48,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Empty response from Anthropic', raw: data });
   }
 
-  res.status(200).json({ insight: text });
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (_) {
+    return res.status(200).json({ insight: text });
+  }
+
+  res.status(200).json({ insight: parsed });
 }

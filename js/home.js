@@ -811,7 +811,7 @@ async function renderAIInsight(rows, kpis, from, to) {
     try {
         const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
         if (cached && (Date.now() - cached.ts) < AI_CACHE_TTL) {
-            aiBody.textContent = cached.text;
+            _renderAIBody(aiBody, cached.text);
             aiCacheNote.textContent = 'Caché · actualiza en ' + _formatCacheAge(cached.ts);
             return;
         }
@@ -850,10 +850,9 @@ async function renderAIInsight(rows, kpis, from, to) {
             throw new Error(`${resp.status} — ${errData.error || 'error desconocido'}${errData.detail ? ': ' + errData.detail : ''}`);
         }
         const data = await resp.json();
-        const text = data.insight;
 
-        localStorage.setItem(cacheKey, JSON.stringify({ text, ts: Date.now() }));
-        aiBody.textContent = text;
+        localStorage.setItem(cacheKey, JSON.stringify({ text: data.insight, ts: Date.now() }));
+        _renderAIBody(aiBody, data.insight);
         aiCacheNote.textContent = 'Generado ahora · válido 6 horas';
     } catch (err) {
         console.error('AI Insight error:', err);
@@ -861,6 +860,58 @@ async function renderAIInsight(rows, kpis, from, to) {
         aiCacheNote.textContent = `Error: ${err.message}`;
         // Do NOT cache errors — next page load will retry automatically
     }
+}
+
+function _renderAIBody(aiBody, insight) {
+    const isJson = typeof insight === 'object' && insight !== null;
+    if (!isJson) {
+        aiBody.innerHTML = `<p>${insight}</p>`;
+        return;
+    }
+
+    const metricsHtml = (insight.metricas || []).map(m =>
+        `<div class="ai-metric-card">
+            <div class="ai-metric-value ai-metric-${m.tipo}">${m.valor}</div>
+            <div class="ai-metric-label">${m.label}</div>
+        </div>`
+    ).join('');
+
+    const criticsHtml = (insight.criticos || []).map(c =>
+        `<tr>
+            <td>
+                <div class="ai-process-name">${c.nombre}</div>
+                <div class="ai-process-detail">${c.detalle}</div>
+            </td>
+            <td><span class="ai-delay-badge ai-delay-${c.severidad}">${c.demora}</span></td>
+        </tr>`
+    ).join('');
+
+    const obsHtml = (insight.observaciones || []).map(o =>
+        `<div class="ai-obs-item">
+            <div class="ai-obs-dot"></div>
+            <span>${o}</span>
+        </div>`
+    ).join('');
+
+    aiBody.innerHTML = `
+        <div class="ai-summary">
+            <div class="ai-summary-label">Resumen ejecutivo</div>
+            <div class="ai-summary-text">${insight.resumen}</div>
+        </div>
+        <div class="ai-metrics-row">${metricsHtml}</div>
+        <div class="ai-divider"></div>
+        <div class="ai-section">
+            <div class="ai-section-title">Procesos críticos</div>
+            <table class="ai-process-table">
+                <thead><tr><th>Proceso</th><th>Demora</th></tr></thead>
+                <tbody>${criticsHtml}</tbody>
+            </table>
+        </div>
+        <div class="ai-divider"></div>
+        <div class="ai-section">
+            <div class="ai-section-title">Observaciones</div>
+            <div class="ai-obs-list">${obsHtml}</div>
+        </div>`;
 }
 
 function _formatCacheAge(ts) {
